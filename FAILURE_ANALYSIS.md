@@ -1,29 +1,47 @@
 # CI Failure Analysis
 
-**Workflow:** Claude Code Review
-**Run Number:** 11
-**Commit:** b140e7e09b952b639d64c927cc027105c1743ae9
-**Branch:** renovate/docker-build-push-action-6.x
-**Failure Time:** 2025-09-07T17:36:31.151Z
+**Workflow:** Security Scan
+**Run Number:** 1
+**Commit:** d02d0b841d940a4478945e8349cec4f672c7adf2
+**Branch:** main
+**Failure Time:** 2025-09-07T18:12:18.198Z
 
 ## Failed Jobs Analysis
 
-### Job: claude-review
+### Job: secrets-scan
 **Failed Steps:**
-- Run Claude Code Review (concluded: failure)
+- Run TruffleHog OSS (concluded: failure)
 
 **Suggested Fixes:**
-- Configure CLAUDE_CODE_OAUTH_TOKEN in repository secrets
-- Verify Claude Code action version and configuration
-- Check GitHub token permissions and scope
-- Review Claude Code workflow triggers and conditions
-- Verify all required secrets are configured in repository settings
-- Check token expiration and permissions
+- Review security scan configurations
+- Update vulnerability database
+- Check for new security policy violations
+
+### Job: docker-security-scan (ci-npm)
+**Failed Steps:**
+- Build image for scanning (concluded: failure)
+
+**Suggested Fixes:**
+- Review security scan configurations
+- Update vulnerability database
+- Check for new security policy violations
+
+### Job: compliance-check
+**Failed Steps:**
+- Check for required security files (concluded: failure)
+
+**Suggested Fixes:**
+- Review security scan configurations
+- Update vulnerability database
+- Check for new security policy violations
 
 ## Automated Actions Taken
-- ✅ Configure CLAUDE_CODE_OAUTH_TOKEN in repository secrets
-- ✅ Verify Claude Code action version and configuration
-- ✅ Check GitHub token permissions and scope
-- ✅ Review Claude Code workflow triggers and conditions
-- ✅ Verify all required secrets are configured in repository settings
-- ✅ Check token expiration and permissions
+- ✅ Review security scan configurations
+- ✅ Update vulnerability database
+- ✅ Check for new security policy violations
+- ✅ Review security scan configurations
+- ✅ Update vulnerability database
+- ✅ Check for new security policy violations
+- ✅ Review security scan configurations
+- ✅ Update vulnerability database
+- ✅ Check for new security policy violations
