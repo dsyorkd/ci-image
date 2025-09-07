@@ -9,8 +9,69 @@ on:
       - '.github/workflows/build-images.yml'
 
 jobs:
+  # Build foundation image first
   build-and-push-ci-base:
     runs-on: ubuntu-latest
+    outputs:
+      base-image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata for ci-base
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/ci-base
+          tags: |
+            type=raw,value=v1.0.0
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=CI Base Image
+            org.opencontainers.image.description=Foundational CI/CD Docker image with security tools
+            org.opencontainers.image.vendor=dsyorkd
+
+      - name: Build and push ci-base image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/ci-base
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build dependent images that extend ci-base
+  build-and-push-dependent-images:
+    runs-on: ubuntu-latest
+    needs: build-and-push-ci-base
+    strategy:
+      matrix:
+        image: 
+          - name: ci-go
+            title: "Go Development Image"
+            description: "Go 1.24 development environment with protobuf and linting tools"
+          - name: ci-npm  
+            title: "Node.js Development Image"
+            description: "Node.js 20 + TypeScript + React/Vite development environment"
+          - name: ci-go-npm
+            title: "Full-Stack Development Image" 
+            description: "Combined Go and Node.js development environment"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -32,19 +93,72 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}/ci-base
+          images: ghcr.io/${{ github.repository }}/${{ matrix.image.name }}
           tags: |
             type=raw,value=v1.0.0
             type=raw,value=latest
           labels: |
-            org.opencontainers.image.title=CI Base Image
-            org.opencontainers.image.description=Foundational CI/CD Docker image with security tools
+            org.opencontainers.image.title=${{ matrix.image.title }}
+            org.opencontainers.image.description=${{ matrix.image.description }}
             org.opencontainers.image.vendor=dsyorkd
 
-      - name: Build and push Docker image
+      - name: Build and push ${{ matrix.image.name }} image
         uses: docker/build-push-action@v6
         with:
-          context: ./docker/ci-base
+          context: ./docker/${{ matrix.image.name }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build standalone images that don't depend on ci-base
+  build-and-push-standalone-images:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - name: ci-python
+            title: "Python Development Image"
+            description: "Python development environment with common tools"
+          - name: ci-security
+            title: "Security Analysis Image"
+            description: "Specialized security scanning and analysis tools"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.image.name }}
+          tags: |
+            type=raw,value=v1.0.0
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image.title }}
+            org.opencontainers.image.description=${{ matrix.image.description }}
+            org.opencontainers.image.vendor=dsyorkd
+
+      - name: Build and push ${{ matrix.image.name }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/${{ matrix.image.name }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
