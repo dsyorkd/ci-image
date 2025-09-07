@@ -1,29 +1,23 @@
 # CI Failure Analysis
 
-**Workflow:** Claude Code Review
-**Run Number:** 11
-**Commit:** b140e7e09b952b639d64c927cc027105c1743ae9
-**Branch:** renovate/docker-build-push-action-6.x
-**Failure Time:** 2025-09-07T17:36:31.151Z
+**Workflow:** CI Tests
+**Run Number:** 1
+**Commit:** d02d0b841d940a4478945e8349cec4f672c7adf2
+**Branch:** main
+**Failure Time:** 2025-09-07T18:12:27.281Z
 
 ## Failed Jobs Analysis
 
-### Job: claude-review
+### Job: docker-tests (ci-npm)
 **Failed Steps:**
-- Run Claude Code Review (concluded: failure)
+- Test Docker build (concluded: failure)
 
 **Suggested Fixes:**
-- Configure CLAUDE_CODE_OAUTH_TOKEN in repository secrets
-- Verify Claude Code action version and configuration
-- Check GitHub token permissions and scope
-- Review Claude Code workflow triggers and conditions
-- Verify all required secrets are configured in repository settings
-- Check token expiration and permissions
+- Review test dependencies and environment setup
+- Check for flaky tests and race conditions
+- Verify test data and fixtures
 
 ## Automated Actions Taken
-- ✅ Configure CLAUDE_CODE_OAUTH_TOKEN in repository secrets
-- ✅ Verify Claude Code action version and configuration
-- ✅ Check GitHub token permissions and scope
-- ✅ Review Claude Code workflow triggers and conditions
-- ✅ Verify all required secrets are configured in repository settings
-- ✅ Check token expiration and permissions
+- ✅ Review test dependencies and environment setup
+- ✅ Check for flaky tests and race conditions
+- ✅ Verify test data and fixtures
