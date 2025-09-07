@@ -6,6 +6,8 @@ on:
       - "Build and Publish Images"
       - "CI Tests" 
       - "Security Scan"
+      - "Claude Code"
+      - "Claude Code Review"
     types: [completed]
 
 jobs:
@@ -152,6 +154,26 @@ jobs:
                 fixes.push('Check for new security policy violations');
               }
               
+              if (workflowName.includes('Claude')) {
+                fixes.push('Configure CLAUDE_CODE_OAUTH_TOKEN in repository secrets');
+                fixes.push('Verify Claude Code action version and configuration');
+                fixes.push('Check GitHub token permissions and scope');
+                fixes.push('Review Claude Code workflow triggers and conditions');
+              }
+              
+              // Check for specific authentication errors in failed steps
+              if (failedSteps && failedSteps.length > 0) {
+                const stepNames = failedSteps.map(step => step.name.toLowerCase());
+                const hasAuthError = stepNames.some(name => 
+                  name.includes('token') || name.includes('auth') || name.includes('claude')
+                );
+                
+                if (hasAuthError) {
+                  fixes.push('Verify all required secrets are configured in repository settings');
+                  fixes.push('Check token expiration and permissions');
+                }
+              }
+              
               return fixes;
             }
 
@@ -191,6 +213,44 @@ jobs:
             if [ ! -f ".trivyignore" ]; then
               touch .trivyignore
               echo "# Trivy ignore patterns" > .trivyignore
+            fi
+          fi
+          
+          # Claude Code workflow fixes
+          if [[ "$WORKFLOW_NAME" == *"Claude"* ]]; then
+            echo "Applying Claude Code workflow fixes..."
+            
+            # Create documentation for Claude Code setup if missing
+            if [ ! -f ".github/CLAUDE_SETUP.md" ]; then
+              echo "# Claude Code Setup" > .github/CLAUDE_SETUP.md
+              echo "" >> .github/CLAUDE_SETUP.md
+              echo "## Required Configuration" >> .github/CLAUDE_SETUP.md
+              echo "" >> .github/CLAUDE_SETUP.md
+              echo "1. **Add OAuth Token**:" >> .github/CLAUDE_SETUP.md
+              echo "   - Go to Repository Settings → Secrets and variables → Actions" >> .github/CLAUDE_SETUP.md
+              echo "   - Add secret: CLAUDE_CODE_OAUTH_TOKEN" >> .github/CLAUDE_SETUP.md
+              echo "   - Get token from: https://claude.ai/settings" >> .github/CLAUDE_SETUP.md
+              echo "" >> .github/CLAUDE_SETUP.md
+              echo "2. **Verify Permissions**:" >> .github/CLAUDE_SETUP.md
+              echo "   - Contents: read" >> .github/CLAUDE_SETUP.md
+              echo "   - Pull requests: write" >> .github/CLAUDE_SETUP.md
+              echo "   - Issues: write" >> .github/CLAUDE_SETUP.md
+              echo "   - Actions: read" >> .github/CLAUDE_SETUP.md
+              echo "" >> .github/CLAUDE_SETUP.md
+              echo "## Troubleshooting" >> .github/CLAUDE_SETUP.md
+              echo "" >> .github/CLAUDE_SETUP.md
+              echo "- **401 Errors**: Check token is valid and not expired" >> .github/CLAUDE_SETUP.md
+              echo "- **Workflow not triggering**: Ensure @claude mentions are in comments" >> .github/CLAUDE_SETUP.md
+              echo "- **Permission errors**: Verify all required permissions are set" >> .github/CLAUDE_SETUP.md
+              echo "Created Claude Code setup documentation"
+            fi
+            
+            # Check workflow syntax for common issues
+            if [ -f ".github/workflows/claude.yml" ]; then
+              # Add error handling if not present
+              if ! grep -q "check-token" .github/workflows/claude.yml; then
+                echo "# NOTE: Consider adding token validation to Claude workflow" >> FAILURE_ANALYSIS.md
+              fi
             fi
           fi
 
