@@ -1,0 +1,8 @@
+# Trivy ignore patterns
+
+# Ignore example configuration files
+packer/proxmox-gh-runner/variables.pkrvars.hcl.example
+
+# Ignore template files with placeholder tokens
+**/*.example
+**/*.template

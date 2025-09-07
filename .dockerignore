@@ -1,0 +1,27 @@
+# Git files
+.git
+.gitignore
+
+# GitHub Actions
+.github
+
+# Task Master files
+.taskmaster
+
+# Claude Code files  
+.claude
+
+# Documentation
+*.md
+LICENSE
+
+# Temporary files
+*.tmp
+*.log
+
+# Packer files
+packer/
+
+# Environment files
+.env
+.env.*
