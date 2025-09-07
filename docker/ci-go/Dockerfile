@@ -62,7 +62,7 @@ RUN go version && \
     protoc-gen-go-grpc --version && \
     golangci-lint version && \
     mockgen -version && \
-    goimports -help > /dev/null 2>&1 && echo "goimports installed successfully"
+    (goimports --help || goimports -h || which goimports) > /dev/null 2>&1 && echo "goimports installed successfully"
 
 # Set default working directory
 WORKDIR /workspace
