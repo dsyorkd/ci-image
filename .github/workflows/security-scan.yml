@@ -89,7 +89,7 @@ jobs:
           echo "Loading base image..."
           docker load < ci-base-scan-image.tar.gz
           # Tag it as the expected registry path for Dockerfile FROM statements
-          docker tag scan-ci-base ghcr.io/spenceryork/ci-image/ci-base:v1.0
+          docker tag scan-ci-base ghcr.io/dsyorkd/ci-image/ci-base:v1.0
 
       - name: Build image for scanning
         run: |

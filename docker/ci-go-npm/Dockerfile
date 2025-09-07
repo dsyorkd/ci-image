@@ -41,7 +41,7 @@ RUN npm install -g \
     tsx@latest
 
 # Stage 3: Final ci-go-npm image extending ci-base
-FROM ghcr.io/spenceryork/ci-image/ci-base:v1.0
+FROM ghcr.io/dsyorkd/ci-image/ci-base:v1.0
 
 # Architecture argument for multi-platform builds
 ARG TARGETARCH

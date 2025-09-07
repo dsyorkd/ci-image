@@ -27,7 +27,7 @@ ubuntu:24.04 (Base Layer)
 ```
 
 ### Registry Strategy
-- **GitHub Container Registry**: `ghcr.io/spenceryork/ci-image/`
+- **GitHub Container Registry**: `ghcr.io/dsyorkd/ci-image/`
 - **Multi-architecture**: Native ARM64 for Raspberry Pi deployment
 - **Semantic versioning**: v1.0.0, v1.0.1, latest tags
 
@@ -72,7 +72,7 @@ ubuntu:24.04 (Base Layer)
 
 ```bash
 # Pull the combined full-stack image
-docker pull ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0
+docker pull ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
 
 # Start development with hot reloading
 docker run -it --rm \
@@ -80,7 +80,7 @@ docker run -it --rm \
   -v $(pwd):/workspace \
   -v pi-controller-cache:/go/pkg/mod \
   -p 3000:3000 -p 8080:8080 \
-  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 \
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 \
   make dev-all
 ```
 
@@ -90,7 +90,7 @@ docker run -it --rm \
 # Build for Raspberry Pi (ARM64)
 docker run --rm -v $(pwd):/workspace \
   -e GOOS=linux -e GOARCH=arm64 \
-  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 \
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 \
   make build-pi
 
 # Deploy to Pi
@@ -116,14 +116,14 @@ make deploy-pi DEPLOY_TARGET=pi@raspberrypi.local
 # Mock GPIO testing (CI/CD safe)
 docker run --rm -v $(pwd):/workspace \
   -e GPIO_MOCK_MODE=true \
-  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 \
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 \
   make test-gpio-mock
 
 # Real hardware testing (Pi only)
 docker run --rm -v $(pwd):/workspace \
   --device /dev/gpiomem \
   --privileged \
-  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 \
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 \
   make test-gpio-real
 ```
 

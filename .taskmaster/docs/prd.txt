@@ -70,10 +70,10 @@ ci-[stack]:v[version]
 ```bash
 # Registry endpoint
 REGISTRY_HOST=ghcr.io
-REGISTRY_NAMESPACE=spenceryork/ci-image
+REGISTRY_NAMESPACE=dsyorkd/ci-image
 
 # Image naming convention
-ghcr.io/spenceryork/ci-image/
+ghcr.io/dsyorkd/ci-image/
 ├── ci-base:latest, v1.0.0, v1.0.1
 ├── ci-go:latest, v1.0.0, v1.0.1  
 ├── ci-npm:latest, v1.0.0, v1.0.1
@@ -95,7 +95,7 @@ echo $GHCR_PAT | docker login ghcr.io -u USERNAME --password-stdin
 ```
 
 **Required GitHub Settings:**
-- **Repository**: `spenceryork/ci-image` (public repository)
+- **Repository**: `dsyorkd/ci-image` (public repository)
 - **Packages**: Enable GitHub Packages for container registry
 - **Permissions**: `packages: write` for GitHub Actions workflows
 - **Visibility**: Public packages for unrestricted pulls
@@ -347,7 +347,7 @@ Optional Targets:
 #### Hot Reloading Development (Secure Approach)
 ```bash
 # Pull specialized image
-docker pull ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0
+docker pull ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
 
 # Start development container with hot reloading (secure)
 docker run -it --rm \
@@ -357,7 +357,7 @@ docker run -it --rm \
   -v pi-controller-go-cache:/go/pkg/mod \
   -p 3000:3000 -p 8080:8080 \
   --user ci-user \
-  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
 
 # Inside container - start development servers
 cd /workspace
@@ -386,16 +386,16 @@ docker run --rm -it \
   -v $(pwd):/workspace \
   -v pi-controller-cache:/go/pkg/mod \
   -p 3000:3000 -p 8080:8080 \
-  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make dev-all
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 make dev-all
 
 # 2. Local testing in container
 docker run --rm -v $(pwd):/workspace \
-  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make test-all
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 make test-all
 
 # 3. Multi-arch build for Pi (ARM64)
 docker run --rm -v $(pwd):/workspace \
   -e GOOS=linux -e GOARCH=arm64 \
-  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make build-pi
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 make build-pi
 
 # 4. Deploy to Raspberry Pi with systemd integration
 make deploy-pi DEPLOY_TARGET=pi@raspberrypi.local
@@ -423,12 +423,12 @@ docker run -it --rm \
   --device /dev/mem \
   --privileged \
   -v $(pwd):/workspace \
-  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make test-gpio
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 make test-gpio
 
 # Mock GPIO testing for CI/CD (non-privileged)
 docker run --rm -v $(pwd):/workspace \
   -e GPIO_MOCK_MODE=true \
-  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make test-gpio-mock
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 make test-gpio-mock
 ```
 
 #### GPIO Testing Modes
@@ -603,15 +603,15 @@ docker-dev: ## Start development in container
 		-v $(PWD):/workspace \
 		-v pi-controller-cache:/go/pkg/mod \
 		-p 3000:3000 -p 8080:8080 \
-		ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make dev-all
+		ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 make dev-all
 
 docker-build: ## Build in container  
 	docker run --rm -v $(PWD):/workspace \
-		ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make build-all
+		ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 make build-all
 
 docker-test: ## Test in container
 	docker run --rm -v $(PWD):/workspace \
-		ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make test-all
+		ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 make test-all
 
 # Help target
 .PHONY: help

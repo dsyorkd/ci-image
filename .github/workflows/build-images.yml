@@ -39,7 +39,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=CI Base Image
             org.opencontainers.image.description=Foundational CI/CD Docker image with security tools
-            org.opencontainers.image.vendor=spenceryork
+            org.opencontainers.image.vendor=dsyorkd
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
