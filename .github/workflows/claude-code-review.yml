@@ -72,7 +72,7 @@ jobs:
             Use `gh pr comment` to provide constructive feedback.
             Focus on actionable suggestions and improvements.
           
-          claude_args: '--allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob" --timeout 300'
+          claude_args: '--allowed-tools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"'
 
       - name: Fallback Manual Review Trigger
         if: steps.check-token.outputs.claude_token_available == 'false'
