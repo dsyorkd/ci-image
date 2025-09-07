@@ -134,7 +134,7 @@ jobs:
         if: steps.check-packages.outputs.python_found == 'true'
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Install safety
         if: steps.check-packages.outputs.python_found == 'true'
