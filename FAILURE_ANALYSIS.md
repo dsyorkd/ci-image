@@ -1,29 +1,23 @@
 # CI Failure Analysis
 
-**Workflow:** Claude Code Review
-**Run Number:** 11
-**Commit:** b140e7e09b952b639d64c927cc027105c1743ae9
-**Branch:** renovate/docker-build-push-action-6.x
-**Failure Time:** 2025-09-07T17:36:31.151Z
+**Workflow:** Security Scan
+**Run Number:** 4
+**Commit:** fe6ab03299282cd833de843d21e5f7e0697c01a4
+**Branch:** renovate/major-github-artifact-actions
+**Failure Time:** 2025-09-07T20:45:58.740Z
 
 ## Failed Jobs Analysis
 
-### Job: claude-review
+### Job: docker-security-scan (ci-npm)
 **Failed Steps:**
-- Run Claude Code Review (concluded: failure)
+- Build image for scanning (concluded: failure)
 
 **Suggested Fixes:**
-- Configure CLAUDE_CODE_OAUTH_TOKEN in repository secrets
-- Verify Claude Code action version and configuration
-- Check GitHub token permissions and scope
-- Review Claude Code workflow triggers and conditions
-- Verify all required secrets are configured in repository settings
-- Check token expiration and permissions
+- Review security scan configurations
+- Update vulnerability database
+- Check for new security policy violations
 
 ## Automated Actions Taken
-- ✅ Configure CLAUDE_CODE_OAUTH_TOKEN in repository secrets
-- ✅ Verify Claude Code action version and configuration
-- ✅ Check GitHub token permissions and scope
-- ✅ Review Claude Code workflow triggers and conditions
-- ✅ Verify all required secrets are configured in repository settings
-- ✅ Check token expiration and permissions
+- ✅ Review security scan configurations
+- ✅ Update vulnerability database
+- ✅ Check for new security policy violations
