@@ -1,7 +1,7 @@
 # Docker CI/CD Image System Makefile
 # Provides targets for building and managing CI Docker images
 
-.PHONY: help build-ci-base build-ci-go build-ci-npm build-ci-go-npm clean
+.PHONY: help build-ci-base build-ci-go build-ci-npm build-ci-go-npm clean packer-validate packer-build
 
 # Default target
 help: ## Show this help message
@@ -120,5 +120,16 @@ test-ci-go-npm: build-ci-go-npm ## Build and test the combined ci-go-npm image
 	docker run --rm ghcr.io/spenceryork/ci-image/ci-go-npm:latest sh -c 'echo "package main\nimport \"fmt\"\nfunc main() { fmt.Println(\"Hello Go+Node CI\") }" > main.go && go build main.go && ./main'
 	docker run --rm ghcr.io/spenceryork/ci-image/ci-go-npm:latest sh -c 'echo "{\"name\":\"test\",\"type\":\"module\"}" > package.json && echo "console.log(\"Hello from Node!\");" > index.js && node index.js'
 	@echo "✅ ci-go-npm image tests completed"
+
+# Packer targets for GitHub Actions runner VMs
+packer-validate: ## Validate Packer template for GitHub Actions runners
+	@echo "Validating GitHub Actions runner Packer template..."
+	cd packer/proxmox-gh-runner && ./build.sh --dry-run
+	@echo "✅ Packer template validation completed"
+
+packer-build: ## Build GitHub Actions runner VM template with Packer
+	@echo "Building GitHub Actions runner VM template..."
+	cd packer/proxmox-gh-runner && ./build.sh
+	@echo "✅ VM template build completed"
 
 .DEFAULT_GOAL := help
