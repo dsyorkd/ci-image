@@ -1,23 +1,35 @@
 # CI Failure Analysis
 
-**Workflow:** CI Tests
-**Run Number:** 1
-**Commit:** d02d0b841d940a4478945e8349cec4f672c7adf2
+**Workflow:** Security Scan
+**Run Number:** 5
+**Commit:** 8283dbed6a062b1be72293a55afce06bb56d95e5
 **Branch:** main
-**Failure Time:** 2025-09-07T18:12:27.281Z
+**Failure Time:** 2025-09-07T21:00:11.965Z
 
 ## Failed Jobs Analysis
 
-### Job: docker-tests (ci-npm)
+### Job: docker-security-scan (ci-npm)
 **Failed Steps:**
-- Test Docker build (concluded: failure)
+- Build image for scanning (concluded: failure)
 
 **Suggested Fixes:**
-- Review test dependencies and environment setup
-- Check for flaky tests and race conditions
-- Verify test data and fixtures
+- Review security scan configurations
+- Update vulnerability database
+- Check for new security policy violations
+
+### Job: secrets-scan
+**Failed Steps:**
+- Run TruffleHog OSS (concluded: failure)
+
+**Suggested Fixes:**
+- Review security scan configurations
+- Update vulnerability database
+- Check for new security policy violations
 
 ## Automated Actions Taken
-- ✅ Review test dependencies and environment setup
-- ✅ Check for flaky tests and race conditions
-- ✅ Verify test data and fixtures
+- ✅ Review security scan configurations
+- ✅ Update vulnerability database
+- ✅ Check for new security policy violations
+- ✅ Review security scan configurations
+- ✅ Update vulnerability database
+- ✅ Check for new security policy violations
