@@ -17,7 +17,7 @@ RUN go install github.com/golang/mock/mockgen@latest
 RUN go install golang.org/x/tools/cmd/goimports@latest
 
 # Stage 2: Node.js builder for installing npm global tools
-FROM node:20-bullseye AS npm-builder
+FROM node:22-bullseye AS npm-builder
 
 # Set Node.js environment variables
 ENV NODE_ENV=production
