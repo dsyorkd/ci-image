@@ -1,0 +1,84 @@
+name: Documentation Lint
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**.md'
+      - '.github/workflows/docs-lint.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**.md'
+      - '.github/workflows/docs-lint.yml'
+
+jobs:
+  lint-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Lint Markdown files
+        uses: DavidAnson/markdownlint-cli2-action@v18
+        with:
+          globs: |
+            **/*.md
+            !node_modules/**/*.md
+          config: |
+            {
+              "MD013": false,
+              "MD033": false,
+              "MD041": false
+            }
+
+      - name: Check for broken links in README
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'no'
+          config-file: '.github/workflows/markdown-link-check-config.json'
+          folder-path: '.'
+          file-path: './README.md'
+
+      - name: Validate Task Master export format
+        run: |
+          if grep -q "TASKMASTER_EXPORT_START" README.md; then
+            echo "✅ Task Master export format found"
+            # Validate that export section is properly closed
+            if ! grep -q "TASKMASTER_EXPORT_END" README.md; then
+              echo "❌ Task Master export section not properly closed"
+              exit 1
+            fi
+            echo "✅ Task Master export section is properly formatted"
+          else
+            echo "ℹ️  No Task Master export found (this is OK)"
+          fi
+
+      - name: Check documentation structure
+        run: |
+          echo "📋 Documentation structure check:"
+          required_sections=(
+            "Project Overview"
+            "Image Architecture" 
+            "Quick Start"
+            "Development"
+            "License"
+          )
+          
+          missing_sections=()
+          for section in "${required_sections[@]}"; do
+            if grep -q "## .*${section}" README.md; then
+              echo "✅ Found: $section"
+            else
+              echo "❌ Missing: $section"
+              missing_sections+=("$section")
+            fi
+          done
+          
+          if [ ${#missing_sections[@]} -gt 0 ]; then
+            echo "❌ Missing required sections in README.md"
+            exit 1
+          fi
+          
+          echo "✅ All required documentation sections present"
