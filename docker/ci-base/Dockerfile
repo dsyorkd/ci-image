@@ -74,7 +74,7 @@ RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash ci-user && \
     usermod -aG sudo ci-user && \
-    echo 'ci-user ALL=(ALL:ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt, /bin/tar' >> /etc/sudoers.d/ci-user && \
+    echo 'ci-user ALL=(ALL:ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt, /bin/tar, /bin/mkdir, /bin/chown' >> /etc/sudoers.d/ci-user && \
     chmod 0440 /etc/sudoers.d/ci-user
 
 # Set up workspace directory and finalize user configuration
