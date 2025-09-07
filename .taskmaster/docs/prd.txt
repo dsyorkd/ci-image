@@ -1,0 +1,888 @@
+# Docker CI/CD Image System - Product Requirements Document
+
+## Executive Summary
+
+### Vision Statement
+Create a comprehensive Docker CI/CD image ecosystem that enables efficient, secure, and scalable development workflows for multi-technology projects, with specialized focus on Go backend and React frontend development targeting Raspberry Pi hardware deployment.
+
+### Strategic Value Proposition
+- **Unified Development Experience**: Single image system supporting Go, TypeScript/React, Python, and infrastructure projects
+- **Hardware-First Approach**: Native ARM64 builds for Raspberry Pi with seamless local development
+- **Scalable Architecture**: Shared base layers with specialized extensions for different technology stacks
+- **Production-Ready**: Complete security tooling, testing frameworks, and deployment capabilities
+
+### Success Vision
+Development teams can pull a single specialized image (e.g., `ci-go-npm:v1.0`) and immediately begin productive development with hot reloading, comprehensive testing, security scanning, and direct deployment to Raspberry Pi hardware without configuration overhead.
+
+## Architecture Overview
+
+### Layered Image Architecture
+
+#### Base Layer Strategy
+```
+ubuntu:22.04-lts
+├── System Essentials (make, git, curl, sudo, bash)
+├── Security Tools (govulncheck, osv-scanner, syft, gosec)
+├── Protocol Buffers (protoc, plugins)
+└── Multi-Architecture Support (amd64, arm64)
+```
+
+#### Specialized Layer Extensions
+```
+Base Layer +
+├── Go Stack Layer
+│   ├── Go 1.24.x toolchain
+│   ├── Go security tools
+│   └── Go build optimization
+├── Node.js Stack Layer
+│   ├── Node.js 20.x/22.x LTS
+│   ├── React 19.x + Vite 7.x + TypeScript 5.8.3
+│   └── Frontend testing (Vitest 3.x, React Testing Library)
+└── Combined Stack Layer
+    ├── All Go capabilities
+    ├── All Node.js capabilities
+    └── Cross-stack integration tools
+```
+
+### Image Naming Convention
+
+#### Standard Format
+```
+ci-[stack]:v[version]
+├── ci-base:v1.0           # Base layer only
+├── ci-go:v1.0             # Go + Base
+├── ci-npm:v1.0            # Node.js + Base
+├── ci-go-npm:v1.0         # Go + Node.js + Base
+├── ci-python:v1.0         # Python + Base
+└── ci-infrastructure:v1.0 # Infrastructure tools + Base
+```
+
+#### Version Descriptions
+- **Semantic Versioning**: Major.Minor.Patch (v1.0.0)
+- **Image Metadata**: Version descriptions, build date, toolchain versions
+- **Compatibility Matrix**: Clear mapping of image versions to supported project versions
+
+### Registry Strategy
+
+#### Primary Registry: GitHub Container Registry
+
+**Registry Configuration:**
+```bash
+# Registry endpoint
+REGISTRY_HOST=ghcr.io
+REGISTRY_NAMESPACE=spenceryork/ci-image
+
+# Image naming convention
+ghcr.io/spenceryork/ci-image/
+├── ci-base:latest, v1.0.0, v1.0.1
+├── ci-go:latest, v1.0.0, v1.0.1  
+├── ci-npm:latest, v1.0.0, v1.0.1
+└── ci-go-npm:latest, v1.0.0, v1.0.1
+```
+
+**Authentication Setup:**
+```bash
+# Personal Access Token (PAT) authentication
+echo $GHCR_PAT | docker login ghcr.io -u USERNAME --password-stdin
+
+# GitHub Actions authentication (automatic)
+- name: Login to GitHub Container Registry
+  uses: docker/login-action@v3
+  with:
+    registry: ghcr.io
+    username: ${{ github.actor }}
+    password: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**Required GitHub Settings:**
+- **Repository**: `spenceryork/ci-image` (public repository)
+- **Packages**: Enable GitHub Packages for container registry
+- **Permissions**: `packages: write` for GitHub Actions workflows
+- **Visibility**: Public packages for unrestricted pulls
+
+#### Distribution Model
+- **Pull from Registry**: Primary distribution method (ghcr.io)
+- **Local Mirror Option**: Support for offline/air-gapped environments
+- **Multi-Architecture**: Native builds for linux/amd64 and linux/arm64
+- **Immutable Tags**: Version-specific tags never change (v1.0.0, v1.0.1)
+- **Mutable Tags**: `latest` tag points to most recent stable version
+- **Free Hosting**: GitHub Container Registry free for public repositories
+
+## Image Specifications
+
+### Base Image: ci-base:v1.0
+
+#### System Foundation
+- **OS**: Ubuntu 22.04 LTS
+- **Architecture**: linux/amd64, linux/arm64
+- **Size Target**: < 500MB
+- **Security**: Monthly security updates, vulnerability scanning
+
+#### Core Tools
+```dockerfile
+# System essentials
+RUN apt-get update && apt-get install -y \
+    make git curl sudo bash tar gzip \
+    build-essential ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Protocol Buffers
+RUN apt-get update && apt-get install -y protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+# Security baseline - non-root user
+RUN adduser --disabled-password --gecos '' ci-user \
+    && usermod -aG sudo ci-user \
+    && echo 'ci-user ALL=(ALL:ALL) NOPASSWD: apt-get, apt update' >> /etc/sudoers
+
+# Set working directory and ownership
+WORKDIR /workspace
+RUN chown ci-user:ci-user /workspace
+USER ci-user
+```
+
+### Specialized Image: ci-go:v1.0
+
+#### Go Environment
+- **Go Version**: 1.24.x (latest patch)
+- **CGO**: Disabled by default (CGO_ENABLED=0)
+- **Size Target**: < 1GB
+- **Cache Optimization**: Pre-populated module cache
+
+#### Go Toolchain - Proper Multi-Stage Build
+```dockerfile
+# Builder stage
+FROM golang:1.24-bullseye as go-tools
+WORKDIR /tmp
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
+    go install golang.org/x/vuln/cmd/govulncheck@latest && \
+    go install github.com/google/osv-scanner/cmd/osv-scanner@latest && \
+    go install github.com/anchore/syft/cmd/syft@latest
+
+# Final stage
+FROM ci-base:v1.0
+
+# Copy Go toolchain
+COPY --from=go-tools /usr/local/go /usr/local/go
+COPY --from=go-tools /go/bin/* /usr/local/bin/
+
+# Set up Go environment
+ENV PATH="/usr/local/go/bin:/usr/local/bin:${PATH}"
+ENV GOPATH="/go"
+ENV GOCACHE="/tmp/go-cache"
+ENV CGO_ENABLED=0
+
+# Create Go directories with proper permissions
+USER root
+RUN mkdir -p /go/bin /go/pkg /go/src /tmp/go-cache && \
+    chown -R ci-user:ci-user /go /tmp/go-cache
+USER ci-user
+```
+
+### Specialized Image: ci-npm:v1.0
+
+#### Node.js Environment
+- **Node.js Version**: 20.x LTS (primary), 22.x LTS (optional)
+- **Package Manager**: npm (latest stable) + yarn support
+- **Size Target**: < 1.5GB
+- **Cache Optimization**: Pre-populated node_modules cache
+
+#### Frontend Stack - Multi-Stage Build
+```dockerfile
+# Builder stage for Node.js tools
+FROM node:20-bullseye as node-tools
+WORKDIR /tmp
+RUN npm install -g typescript@~5.8.3 prettier@^3.6.2 eslint@^9.33.0 && \
+    npm install -g react@19 vite@^7.1.2 vitest@^3.2.4 @testing-library/react@^16.3.0
+
+# Final stage
+FROM ci-base:v1.0
+
+# Copy Node.js and global packages
+COPY --from=node-tools /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-tools /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=node-tools /usr/local/lib/node_modules /usr/local/lib/node_modules
+
+# Set up Node.js environment
+ENV NODE_PATH="/usr/local/lib/node_modules"
+ENV PATH="/usr/local/bin:${PATH}"
+ENV NPM_CONFIG_PREFIX="/usr/local"
+ENV NPM_CONFIG_CACHE="/tmp/.npm"
+
+# Create npm cache directory with proper permissions
+USER root
+RUN mkdir -p /tmp/.npm && chown -R ci-user:ci-user /tmp/.npm
+USER ci-user
+```
+
+### Combined Image: ci-go-npm:v1.0
+
+#### Full-Stack Environment
+- **Inheritance**: ci-go:v1.0 + ci-npm:v1.0 capabilities
+- **Size Target**: < 2GB
+- **Integration**: Cross-stack build tools and workflows
+- **Primary Use Case**: pi-controller project (Go backend + React frontend)
+
+#### Cross-Stack Features - Proper Multi-Stage Build
+```dockerfile
+# Multi-stage build for size optimization
+FROM golang:1.24-bullseye as go-builder
+WORKDIR /tmp
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
+    go install golang.org/x/vuln/cmd/govulncheck@latest
+
+FROM node:20-bullseye as node-builder
+WORKDIR /tmp
+RUN npm install -g typescript@~5.8.3 prettier@^3.6.2 eslint@^9.33.0
+
+FROM ci-base:v1.0
+
+# Copy Go toolchain from builder
+COPY --from=go-builder /usr/local/go /usr/local/go
+COPY --from=go-builder /go/bin/* /usr/local/bin/
+
+# Copy Node.js from builder
+COPY --from=node-builder /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-builder /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=node-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+
+# Set up environment variables
+ENV PATH="/usr/local/go/bin:/usr/local/bin:${PATH}"
+ENV GOPATH="/go"
+ENV GOCACHE="/tmp/go-cache"
+ENV CGO_ENABLED=0
+
+# Create directories with proper permissions
+USER root
+RUN mkdir -p /go/bin /go/pkg /go/src /tmp/go-cache && \
+    chown -R ci-user:ci-user /go /tmp/go-cache
+USER ci-user
+```
+
+## Technical Requirements
+
+### Performance Specifications
+
+#### Build Performance Targets
+- **Go Build Time**: < 2 minutes for typical project
+- **React Build Time**: < 3 minutes for production build
+- **Total CI Pipeline**: < 10 minutes end-to-end
+- **Cache Hit Ratio**: > 80% for repeated builds
+
+#### Resource Utilization
+- **Memory Usage**: < 4GB during typical builds
+- **CPU Efficiency**: Parallel build support (2-8 cores)
+- **Storage Efficiency**: Layer sharing reduces total storage by 60%
+
+### Security Requirements
+
+#### Vulnerability Management
+```bash
+# Integrated security scanning
+govulncheck ./...                    # Go vulnerability scanning
+osv-scanner --recursive .           # Multi-language vulnerability detection
+syft . -o json                      # SBOM generation
+gosec ./...                         # Go security analysis
+npm audit                           # Node.js dependency scanning
+```
+
+#### Security Baseline
+- **Base Image**: Regular security updates (monthly)
+- **Tool Versions**: Pinned versions with security tracking
+- **Secrets Detection**: TruffleHog integration
+- **Supply Chain**: SBOM generation for all builds
+
+### Testing Infrastructure
+
+#### Backend Testing Capabilities
+- **Unit Tests**: Go testing framework with race detection
+- **Integration Tests**: Database and API testing
+- **Benchmark Tests**: Performance regression detection
+- **Security Tests**: Automated vulnerability scanning
+
+#### Frontend Testing Stack
+```json
+{
+  "vitest": "^3.2.4",
+  "@testing-library/react": "^16.3.0", 
+  "@testing-library/jest-dom": "^6.8.0",
+  "@testing-library/user-event": "^14.6.1",
+  "jsdom": "^26.1.0"
+}
+```
+
+#### Coverage Requirements
+- **Backend Coverage**: > 80% line coverage
+- **Frontend Coverage**: > 75% component coverage
+- **Coverage Formats**: JSON, XML, HTML reports
+- **Integration**: Codecov reporting
+
+### Multi-Architecture Support
+
+#### Target Platforms
+```yaml
+Primary Targets:
+  - linux/amd64  # Development and CI
+  - linux/arm64  # Raspberry Pi 4/5
+
+Optional Targets:
+  - linux/arm/v7  # Raspberry Pi 3
+  - linux/arm/v6  # Raspberry Pi Zero
+```
+
+#### Build Strategy
+- **Native Builds**: Platform-specific optimizations
+- **Cross-Compilation**: Go cross-compilation support
+- **Emulation**: QEMU for cross-platform testing
+- **Registry**: Multi-arch manifests in GitHub Container Registry
+
+## Development Workflows
+
+### Local Development Experience
+
+#### Hot Reloading Development (Secure Approach)
+```bash
+# Pull specialized image
+docker pull ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0
+
+# Start development container with hot reloading (secure)
+docker run -it --rm \
+  --name pi-controller-dev \
+  -v $(pwd):/workspace \
+  -v pi-controller-node-modules:/workspace/web/node_modules \
+  -v pi-controller-go-cache:/go/pkg/mod \
+  -p 3000:3000 -p 8080:8080 \
+  --user ci-user \
+  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0
+
+# Inside container - start development servers
+cd /workspace
+make web-deps     # Install/update Node.js dependencies
+make web-dev &    # React dev server with hot reload on :3000
+make api-dev &    # Go API server with live reload on :8080
+
+# Or use the integrated development command
+make dev-all      # Starts both frontend and backend with hot reload
+```
+
+#### Development Container Features
+- **Source Code Mounting**: Live file changes reflected in container
+- **Named Volumes**: Persistent node_modules and Go module cache
+- **Port Forwarding**: Frontend development server (:3000) and API (:8080)
+- **Non-Root Execution**: Secure container execution as ci-user
+- **File Watching**: Built-in file watchers for Go and React hot reload
+- **Shell Access**: Interactive development environment with proper permissions
+
+### Pi Deployment Workflow
+
+#### Development to Production Pipeline
+```bash
+# 1. Local development with hot reload (secure)
+docker run --rm -it \
+  -v $(pwd):/workspace \
+  -v pi-controller-cache:/go/pkg/mod \
+  -p 3000:3000 -p 8080:8080 \
+  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make dev-all
+
+# 2. Local testing in container
+docker run --rm -v $(pwd):/workspace \
+  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make test-all
+
+# 3. Multi-arch build for Pi (ARM64)
+docker run --rm -v $(pwd):/workspace \
+  -e GOOS=linux -e GOARCH=arm64 \
+  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make build-pi
+
+# 4. Deploy to Raspberry Pi with systemd integration
+make deploy-pi DEPLOY_TARGET=pi@raspberrypi.local
+# This expands to:
+# scp ./dist/pi-controller-arm64 pi@raspberrypi.local:/opt/pi-controller/bin/
+# ssh pi@raspberrypi.local 'sudo systemctl restart pi-controller && systemctl status pi-controller'
+```
+
+#### Pi-Specific Optimizations
+- **ARM64 Cross-Compilation**: Build x86_64 → ARM64 for faster builds
+- **Static Binaries**: CGO disabled, no runtime dependencies
+- **Minimal Footprint**: < 50MB binaries optimized for Pi constraints
+- **systemd Integration**: Service files and deployment automation
+- **GPIO Access**: Containerized GPIO testing with device mapping
+- **Performance Monitoring**: Built-in Pi resource monitoring
+
+### GPIO Testing Strategy
+
+#### Container-Based GPIO Testing
+
+```bash
+# Development container with GPIO device access
+docker run -it --rm \
+  --device /dev/gpiomem \
+  --device /dev/mem \
+  --privileged \
+  -v $(pwd):/workspace \
+  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make test-gpio
+
+# Mock GPIO testing for CI/CD (non-privileged)
+docker run --rm -v $(pwd):/workspace \
+  -e GPIO_MOCK_MODE=true \
+  ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make test-gpio-mock
+```
+
+#### GPIO Testing Modes
+
+**1. Mock Mode (CI/CD)**: 
+- GPIO operations simulated with mock interfaces
+- Tests GPIO logic without hardware requirements
+- Fast execution in containerized CI environments
+- Validates pin configuration and state management
+
+**2. Device Mode (Local Pi)**:
+- Direct hardware access to GPIO pins 18,19,20,21
+- Requires privileged container with device mapping
+- Tests actual electrical signals and timing
+- Validates hardware integration and real-world behavior
+
+**3. Emulation Mode (Development)**:
+- Virtual GPIO simulation with realistic timing
+- Simulates electrical characteristics and responses
+- Safe for development without Pi hardware
+- Supports interactive testing and debugging
+
+#### GPIO Test Configuration
+
+```go
+// GPIO test configuration in tests
+type GPIOTestConfig struct {
+    Pins    []int  // [18, 19, 20, 21]
+    Mode    string // "mock", "device", "emulation"  
+    Timeout time.Duration
+    MockResponses map[int][]bool // Pin -> Response sequence
+}
+
+// Example test execution
+func TestGPIOController(t *testing.T) {
+    config := GetGPIOTestConfig() // From environment
+    controller := gpio.NewController(config)
+    // Test implementation...
+}
+```
+
+#### Development Workflow Integration
+
+```makefile
+# Makefile targets for GPIO testing
+.PHONY: test-gpio test-gpio-mock test-gpio-real
+
+test-gpio-mock:
+	@echo "Running GPIO tests in mock mode..."
+	GPIO_MOCK_MODE=true go test -v ./pkg/gpio/...
+
+test-gpio-real:
+	@echo "Running GPIO tests with real hardware..."
+	@if [ ! -e /dev/gpiomem ]; then echo "Error: GPIO device not available"; exit 1; fi
+	sudo GPIO_DEVICE_MODE=true go test -v ./pkg/gpio/...
+
+test-gpio: test-gpio-mock  # Default to safe mock mode
+```
+
+## Comprehensive Makefile Integration
+
+The Docker images integrate with a complete Makefile system supporting both development and CI workflows:
+
+### Core Development Targets
+
+```makefile
+# Environment setup
+.PHONY: deps web-deps dev-deps
+deps: ## Install Go dependencies
+	go mod tidy && go mod download
+
+web-deps: ## Install Node.js dependencies  
+	cd web && npm ci
+
+dev-deps: deps web-deps ## Install all development dependencies
+
+# Development servers with hot reload
+.PHONY: dev-all api-dev web-dev
+dev-all: ## Start both API and web dev servers
+	make api-dev & make web-dev & wait
+
+api-dev: ## Start Go API server with live reload
+	@echo "Starting Go API server on :8080..."
+	air -c .air.toml || go run cmd/api/main.go
+
+web-dev: ## Start React dev server with hot reload
+	@echo "Starting React dev server on :3000..."
+	cd web && npm run dev
+
+# Build targets
+.PHONY: build build-api build-web build-pi build-all
+build-api: ## Build Go API binary
+	CGO_ENABLED=0 go build -ldflags="-w -s" -o dist/api cmd/api/main.go
+
+build-web: ## Build React production assets
+	cd web && npm run build
+
+build-pi: ## Cross-compile for Raspberry Pi (ARM64)
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
+		-ldflags="-w -s -X main.version=$(VERSION)" \
+		-o dist/pi-controller-arm64 cmd/api/main.go
+
+build-all: build-api build-web build-pi ## Build all components
+
+# Testing targets
+.PHONY: test test-api test-web test-all
+test-api: ## Run Go unit tests
+	go test -v -race ./...
+
+test-web: ## Run React tests
+	cd web && npm run test
+
+test-all: test-api test-web test-gpio ## Run all test suites
+
+# Code quality targets  
+.PHONY: fmt lint lint-api lint-web
+fmt: ## Format all code
+	go fmt ./... && cd web && npm run format
+
+lint-api: ## Lint Go code
+	golangci-lint run ./...
+
+lint-web: ## Lint React/TypeScript code
+	cd web && npm run lint
+
+lint: lint-api lint-web ## Lint all code
+
+# Security and compliance
+.PHONY: security-scan security-api security-web
+security-api: ## Run Go security scans
+	govulncheck ./... && gosec ./...
+
+security-web: ## Run Node.js security scans  
+	cd web && npm audit
+
+security-scan: security-api security-web ## Run all security scans
+	osv-scanner --recursive .
+	syft . -o json > dist/sbom.json
+
+# Protocol buffers
+.PHONY: proto proto-gen proto-clean
+proto-gen: ## Generate protobuf code
+	protoc --go_out=. --go-grpc_out=. api/proto/*.proto
+
+proto-clean: ## Clean generated protobuf files
+	find . -name "*.pb.go" -type f -delete
+
+proto: proto-clean proto-gen ## Regenerate all protobuf code
+
+# Deployment targets
+.PHONY: deploy-pi package-pi
+package-pi: build-pi ## Package Pi deployment
+	mkdir -p dist/pi-deploy
+	cp dist/pi-controller-arm64 dist/pi-deploy/
+	cp systemd/pi-controller.service dist/pi-deploy/
+	cp configs/pi-controller.conf dist/pi-deploy/
+
+deploy-pi: package-pi ## Deploy to Raspberry Pi
+	@if [ -z "$(DEPLOY_TARGET)" ]; then echo "Usage: make deploy-pi DEPLOY_TARGET=user@pi-host"; exit 1; fi
+	scp -r dist/pi-deploy/* $(DEPLOY_TARGET):/tmp/
+	ssh $(DEPLOY_TARGET) 'sudo mv /tmp/pi-controller-arm64 /opt/pi-controller/bin/ && \
+		sudo mv /tmp/pi-controller.service /etc/systemd/system/ && \
+		sudo mv /tmp/pi-controller.conf /etc/pi-controller/ && \
+		sudo systemctl daemon-reload && \
+		sudo systemctl restart pi-controller && \
+		systemctl status pi-controller'
+
+# Container integration targets
+.PHONY: docker-dev docker-build docker-test
+docker-dev: ## Start development in container
+	docker run -it --rm \
+		-v $(PWD):/workspace \
+		-v pi-controller-cache:/go/pkg/mod \
+		-p 3000:3000 -p 8080:8080 \
+		ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make dev-all
+
+docker-build: ## Build in container  
+	docker run --rm -v $(PWD):/workspace \
+		ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make build-all
+
+docker-test: ## Test in container
+	docker run --rm -v $(PWD):/workspace \
+		ghcr.io/spenceryork/ci-image/ci-go-npm:v1.0 make test-all
+
+# Help target
+.PHONY: help
+help: ## Show this help message
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+.DEFAULT_GOAL := help
+```
+
+### Container-Optimized Features
+
+- **Cached Dependencies**: Persistent volumes for node_modules and Go modules
+- **Hot Reload Integration**: File watchers work across container boundaries  
+- **Cross-Compilation**: ARM64 builds for Pi deployment
+- **Security Integration**: Comprehensive scanning in containerized environment
+- **Deployment Automation**: One-command Pi deployment with systemd integration
+
+### CI/CD Integration
+
+#### GitHub Actions Workflow
+```yaml
+name: CI/CD Pipeline
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/org/ci-go-npm:v1.0
+    steps:
+      - uses: actions/checkout@v4
+      - run: make lint test-all security-scan
+      
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/org/ci-go-npm:v1.0
+    steps:
+      - uses: actions/checkout@v4
+      - run: make build-all
+      - run: make build-pi
+```
+
+#### Build Artifacts
+- **Backend Binaries**: Multi-architecture Go binaries
+- **Frontend Assets**: Optimized React build (dist/)
+- **Security Reports**: Vulnerability and SBOM reports
+- **Test Results**: Coverage and test reports
+- **Container Images**: Application-specific images
+
+## Implementation Roadmap
+
+### Phase 1: Foundation (Weeks 1-3)
+
+#### Base Infrastructure
+- **Repository Setup**: Create spenceryork/ci-image repository with proper structure
+- **Base Image Development**: ci-base:v1.0 with Ubuntu, security tools, and system essentials
+- **GitHub Container Registry**: Authentication, permissions, and basic publishing
+- **Build Pipeline**: GitHub Actions workflow for multi-architecture builds
+- **Documentation**: Initial README and usage examples
+
+#### Deliverables
+- Working GitHub repository with proper structure
+- `ci-base:v1.0` image published and tested
+- Basic multi-architecture build pipeline (amd64 initially)
+- GitHub Actions workflow for image building
+- Initial documentation and examples
+
+### Phase 2: Go Specialization (Weeks 4-6)
+
+#### Go-Specific Image
+- **Go Toolchain**: ci-go:v1.0 with Go 1.24.x, tools, and security scanners
+- **Multi-Stage Optimization**: Proper layer sharing and size optimization
+- **Testing Integration**: Go testing framework with GPIO mock support
+- **Security Scanning**: govulncheck, osv-scanner, gosec integration
+- **ARM64 Support**: Cross-compilation and native ARM64 builds
+
+#### Deliverables
+- `ci-go:v1.0` image with complete Go toolchain
+- Comprehensive security scanning integration
+- GPIO testing framework (mock and device modes)
+- ARM64 cross-compilation support
+- Performance benchmarks and optimization
+
+### Phase 3: Frontend Integration (Weeks 7-9)
+
+#### Node.js and React Stack
+- **Node.js Toolchain**: ci-npm:v1.0 with Node 20.x, TypeScript, React tools
+- **Frontend Testing**: Vitest, React Testing Library integration
+- **Combined Image**: ci-go-npm:v1.0 merging Go and Node.js capabilities
+- **Hot Reload Development**: Secure development container workflow
+- **Build Optimization**: Dependency caching and layer sharing
+
+#### Deliverables
+- `ci-npm:v1.0` image with complete frontend stack
+- `ci-go-npm:v1.0` production-ready combined image
+- Working hot reload development environment
+- Comprehensive Makefile integration
+- Pi deployment automation with systemd
+
+### Phase 4: Production & Documentation (Weeks 10-12)
+
+#### Production Readiness
+- **Documentation**: Complete user guides, troubleshooting, and best practices
+- **Testing & Validation**: End-to-end testing with actual Pi hardware
+- **Performance Tuning**: Image size optimization and build time improvements
+- **Monitoring Setup**: Basic usage tracking and error monitoring
+- **Community Support**: Issue templates, contributing guidelines
+
+#### Deliverables
+- Complete documentation website or comprehensive README
+- Validated workflows on actual Raspberry Pi hardware
+- Optimized images with size and performance targets met
+- Community support infrastructure
+- Stable v1.0.0 release with semantic versioning
+
+## Operational Considerations
+
+### Image Maintenance
+
+#### Update Strategy
+- **Security Updates**: Monthly base image updates
+- **Tool Updates**: Quarterly toolchain updates (Go, Node.js)
+- **Breaking Changes**: Major version increments with migration guides
+- **Rollback Support**: Previous version availability for 6 months
+
+#### Version Management
+```
+Version Lifecycle:
+├── Latest (v1.x)     # Always current stable
+├── Stable (v1.0.x)   # Patch updates only
+├── Previous (v0.x)   # Security updates only
+└── Deprecated        # 30-day removal notice
+```
+
+### Monitoring & Observability
+
+#### Usage Metrics
+- **Pull Statistics**: Download counts and geographic distribution
+- **Build Performance**: Average build times and success rates
+- **Error Tracking**: Failed builds and common issues
+- **Resource Usage**: Memory and CPU utilization patterns
+
+#### Health Monitoring
+```bash
+# Image health checks
+docker run --rm ci-go-npm:v1.0 /health-check.sh
+
+# Tool version validation
+docker run --rm ci-go-npm:v1.0 /version-check.sh
+
+# Security baseline verification
+docker run --rm ci-go-npm:v1.0 /security-check.sh
+```
+
+### Scaling Considerations
+
+#### Multi-Project Support
+- **Template System**: Project-specific image customization
+- **Plugin Architecture**: Extensible tool integration
+- **Configuration Management**: Environment-specific configurations
+- **Resource Sharing**: Cross-project cache optimization
+
+#### Performance Scaling
+- **Parallel Builds**: Multi-core build optimization
+- **Cache Strategies**: Global and project-specific caching
+- **Registry Optimization**: Geo-distributed image storage
+- **Resource Limits**: Configurable memory and CPU limits
+
+## Success Metrics
+
+### Developer Experience Metrics
+
+#### Productivity Indicators
+- **Setup Time**: < 10 minutes from pull to first successful build
+- **Build Speed**: 25-40% improvement over local builds (target: 25% minimum)
+- **Cache Efficiency**: > 60% cache hit rate for dependencies (target: improve over time)
+- **Documentation Quality**: Clear setup guide with < 3 common issues in first month
+
+#### Adoption Metrics
+- **Development Usage**: Primary development workflow for pi-controller project
+- **CI Integration**: 100% CI builds using containerized environment
+- **Pi Deployment Success**: > 90% successful deployments to Pi hardware
+- **Developer Feedback**: Positive feedback on development workflow improvements
+
+### Technical Performance Metrics
+
+#### Build Performance
+```
+Realistic Targets:
+├── Go Build Time: < 3 minutes (target: faster than local with cold cache)
+├── React Build Time: < 4 minutes (target: comparable to local with hot reload)
+├── Full Test Suite: < 10 minutes (target: reliable and comprehensive)
+└── Security Scan: < 3 minutes (new capability, acceptable overhead)
+```
+
+#### Resource Efficiency
+- **Image Size**: < 2.5GB for ci-go-npm:v1.0 (optimized through multi-stage builds)
+- **Memory Usage**: < 6GB peak during builds (allowing for development containers)
+- **Storage Efficiency**: Shared base layers reduce duplicate downloads
+- **Network Usage**: Cached dependencies improve subsequent builds
+
+### Security & Compliance Metrics
+
+#### Security Posture
+- **Vulnerability Detection**: Automated scanning catches high and critical vulnerabilities
+- **Security Integration**: SBOM generation and dependency tracking enabled
+- **Update Strategy**: Monthly security updates with documented process
+- **Best Practices**: Non-root containers, minimal attack surface
+
+#### Operational Metrics
+- **Build Reliability**: > 95% successful builds (allowing for dependency issues)
+- **Registry Availability**: Leverages GitHub's infrastructure reliability
+- **Error Recovery**: Clear error messages and troubleshooting guide
+- **Documentation**: Comprehensive setup and usage documentation
+
+### Business Impact Metrics
+
+#### Development Velocity
+- **Consistent Environment**: Eliminates "works on my machine" issues
+- **Faster Onboarding**: New developers productive within first day
+- **Pi Deployment**: Streamlined deployment process to Raspberry Pi
+- **Development Focus**: Less time on environment setup, more on features
+
+#### Value Delivered
+- **Standardization**: Consistent development environment across team
+- **Security Integration**: Built-in security scanning without manual setup
+- **Pi Optimization**: Native ARM64 builds for target hardware
+- **Hot Reload Development**: Fast feedback loop for React development
+
+## Risk Management & Mitigation
+
+### Technical Risks
+
+#### Image Size Bloat
+- **Risk**: Combined images exceed storage/bandwidth limits
+- **Mitigation**: Multi-stage builds, layer optimization, regular size audits
+- **Monitoring**: Automated size alerts at 2GB threshold
+
+#### Security Vulnerabilities
+- **Risk**: Base images or tools contain critical vulnerabilities
+- **Mitigation**: Automated scanning, monthly updates, rollback procedures
+- **Monitoring**: Daily vulnerability scans with severity alerting
+
+#### Performance Regression
+- **Risk**: New versions slower than previous versions
+- **Mitigation**: Automated performance testing, benchmark gates
+- **Monitoring**: Build time tracking with regression alerts
+
+### Operational Risks
+
+#### Registry Downtime
+- **Risk**: GitHub Container Registry unavailable
+- **Mitigation**: Mirror registry, local caching, offline mode
+- **Monitoring**: Registry health checks, availability SLA tracking
+
+#### Breaking Changes
+- **Risk**: Tool updates break existing workflows
+- **Mitigation**: Staging environment, gradual rollouts, rollback procedures
+- **Monitoring**: Build failure rate spike detection
+
+#### Developer Adoption
+- **Risk**: Low adoption rate, resistance to containerized development
+- **Mitigation**: Comprehensive training, migration assistance, feedback integration
+- **Monitoring**: Usage analytics, satisfaction surveys, support ticket analysis
+
+## Conclusion
+
+This Docker CI/CD image system represents a strategic investment in developer productivity, security, and operational efficiency. By providing specialized, optimized images with comprehensive tooling and seamless development workflows, the system will accelerate development velocity while maintaining high security and quality standards.
+
+The layered architecture ensures scalability and maintainability, while the focus on Raspberry Pi deployment addresses the specific hardware requirements of the pi-controller project. The comprehensive monitoring and success metrics framework will ensure continuous improvement and demonstrate clear business value.
+
+Success will be measured not just by technical metrics, but by developer satisfaction, reduced time-to-market, and improved software quality across all supported project types.

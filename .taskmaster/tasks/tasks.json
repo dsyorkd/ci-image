@@ -1,0 +1,244 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Implement Foundational `ci-base` Docker Image",
+        "description": "Create the `ci-base` Docker image based on Ubuntu 22.04 LTS. This image will serve as the foundation for all other specialized images and must include essential system tools, security scanners, and the Protocol Buffers compiler.",
+        "details": "Based on the PRD, the Dockerfile for `ci-base` must: \n1. Use `ubuntu:22.04` as the base.\n2. Install `make`, `git`, `curl`, `sudo`, `bash`, `build-essential`, and `protobuf-compiler`.\n3. Install security tools: `govulncheck`, `osv-scanner`, `syft`, and `gosec` by downloading their binaries or using a package manager.\n4. Create a non-root user `ci-user` with passwordless `sudo` privileges for package management.\n5. Set the default `WORKDIR` to `/workspace` and assign ownership to `ci-user`.\n6. Ensure the final image is built for both `linux/amd64` and `linux/arm64` architectures.",
+        "testStrategy": "Verify by running the built image and checking for the presence and correct versions of all installed tools (e.g., `git --version`, `protoc --version`, `osv-scanner --version`). Confirm that the default user is `ci-user` and that it can execute commands in the `/workspace` directory. Test `sudo apt-get update` to verify sudo permissions.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize Dockerfile and Install Core System Packages",
+            "description": "Create the initial Dockerfile at `docker/ci-base/Dockerfile`, set `ubuntu:22.04` as the base, and install essential system packages required for the CI environment.",
+            "dependencies": [],
+            "details": "In a new directory `docker/ci-base`, create a `Dockerfile`. Start with `FROM ubuntu:22.04`. Use a single `RUN` instruction to update apt, install `make`, `git`, `curl`, `sudo`, `bash`, `build-essential`, and `protobuf-compiler`, and then clean up the apt cache to minimize layer size. Set `DEBIAN_FRONTEND=noninteractive` to prevent interactive prompts during the build.",
+            "status": "pending",
+            "testStrategy": "Build the Docker image locally. Run a container and execute `git --version`, `make --version`, and `protoc --version` to verify the packages are installed correctly."
+          },
+          {
+            "id": 2,
+            "title": "Implement Multi-Architecture Installation for Security Tools",
+            "description": "Add a build stage to download and install the security tools (`govulncheck`, `osv-scanner`, `syft`, `gosec`), ensuring the correct binaries are fetched for both `linux/amd64` and `linux/arm64` architectures.",
+            "dependencies": [],
+            "details": "In the `docker/ci-base/Dockerfile`, add `ARG` declarations for `TARGETARCH`. Use a multi-line `RUN` command that inspects the value of `TARGETARCH` to download the appropriate pre-compiled binaries for each security tool from their official release pages. Make the downloaded binaries executable and move them to `/usr/local/bin`.",
+            "status": "pending",
+            "testStrategy": "Perform a local build for a specific architecture (e.g., `docker build --platform linux/amd64 ...`). Run the resulting image and execute each security tool with its `--version` flag (e.g., `osv-scanner --version`) to confirm it's installed and executable."
+          },
+          {
+            "id": 3,
+            "title": "Create and Configure Non-Root `ci-user`",
+            "description": "Enhance image security by creating a dedicated non-root user named `ci-user` and granting it passwordless `sudo` privileges for package management tasks.",
+            "dependencies": [],
+            "details": "Add a `RUN` instruction to the Dockerfile to execute `useradd` to create the `ci-user` with a home directory. Then, add this user to the `sudo` group. Create a new file in `/etc/sudoers.d/` to grant `ci-user` passwordless `sudo` access (e.g., `echo 'ci-user ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/ci-user`).",
+            "status": "pending",
+            "testStrategy": "Run a container as the root user. Execute `su - ci-user` to switch to the new user. Verify that `sudo apt-get update` can be run without a password prompt."
+          },
+          {
+            "id": 4,
+            "title": "Set Up Workspace Directory and Finalize User Configuration",
+            "description": "Establish the default working directory for CI jobs, assign correct ownership to `ci-user`, and set `ci-user` as the default user for the image.",
+            "dependencies": [],
+            "details": "In the Dockerfile, add a `RUN` instruction to create the `/workspace` directory and use `chown` to set its owner to `ci-user:ci-user`. Following this, add the `WORKDIR /workspace` instruction to set it as the default directory. Finally, use the `USER ci-user` instruction to ensure subsequent commands and container sessions run as the non-root user.",
+            "status": "pending",
+            "testStrategy": "Run a container from the built image. Execute `whoami` to confirm the user is `ci-user`. Execute `pwd` to confirm the current directory is `/workspace`. Attempt to create a file with `touch test.txt` to verify write permissions."
+          },
+          {
+            "id": 5,
+            "title": "Add Makefile Target for Local `ci-base` Image Build",
+            "description": "To facilitate local development and testing before the full CI/CD pipeline is implemented, create a `Makefile` with a target to build the `ci-base` Docker image.",
+            "dependencies": [],
+            "details": "Based on the plan for Task 7, create a preliminary `Makefile` in the project root. Add a target named `build-ci-base`. This target should execute the `docker build` command, pointing to `docker/ci-base/Dockerfile`, and tag the resulting image as `ghcr.io/your-org/ci-base:latest` (using a placeholder for the org/repo name).",
+            "status": "pending",
+            "testStrategy": "From the project root, run `make build-ci-base`. Verify that the command executes successfully and that a new Docker image with the specified tag is present in the local image repository by running `docker images`."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Set Up Multi-Arch Build and Publish Pipeline in GitHub Actions",
+        "description": "Establish a GitHub Actions workflow to automatically build and publish the Docker images to the GitHub Container Registry (GHCR). The initial focus is on building the `ci-base` image with multi-architecture support.",
+        "details": "Create a new workflow file under `.github/workflows/build-images.yml`. This workflow should:\n1. Trigger on pushes to the `main` branch.\n2. Use `docker/login-action` to authenticate with GHCR using the `GITHUB_TOKEN`.\n3. Use `docker/setup-qemu-action` and `docker/setup-buildx-action` to enable multi-architecture builds.\n4. Build and push the `ci-base` image for `linux/amd64` and `linux/arm64` platforms.\n5. Implement the tagging strategy from the PRD: a semantic version tag (e.g., `v1.0.0`) and the `latest` tag.",
+        "testStrategy": "Trigger the workflow by pushing a change to the `ci-base` Dockerfile. Verify that the action completes successfully. Check GHCR to confirm that the `ci-base` image is published with both `v1.0.0` and `latest` tags, and that the manifest list includes both `amd64` and `arm64` architectures.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Develop Specialized `ci-go` Image with Multi-Stage Build",
+        "description": "Create the `ci-go` image by extending `ci-base`. This image will contain the complete Go toolchain and specific Go-related security and development tools, optimized for size using a multi-stage build.",
+        "details": "Create a Dockerfile for `ci-go` that:\n1. Uses `ci-base:v1.0` as the final stage base.\n2. Implements a multi-stage build using `golang:1.24-bullseye` as a builder stage.\n3. In the builder stage, `go install` the required tools: `protoc-gen-go`, `protoc-gen-go-grpc`, and `golangci-lint`.\n4. In the final stage, copy the Go toolchain (`/usr/local/go`) and the installed Go binaries (`/go/bin/*`) from the builder stage.\n5. Set environment variables (`PATH`, `GOPATH`, `GOCACHE`, `CGO_ENABLED=0`).\n6. Create and set permissions for Go directories (`/go`, `/tmp/go-cache`) for the `ci-user`.",
+        "testStrategy": "Build the `ci-go` image. Run a container and verify that `go version` reports 1.24.x and that tools like `golangci-lint` are executable. Test building a simple Go application inside the container to ensure the environment is correctly configured.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Develop Specialized `ci-npm` Image with Multi-Stage Build",
+        "description": "Create the `ci-npm` image by extending `ci-base`. This image will contain the Node.js LTS toolchain and essential frontend development and testing tools, optimized using a multi-stage build.",
+        "details": "Create a Dockerfile for `ci-npm` that:\n1. Uses `ci-base:v1.0` as the final stage base.\n2. Implements a multi-stage build using `node:20-bullseye` as a builder stage.\n3. In the builder stage, `npm install -g` the required tools: `typescript`, `prettier`, `eslint`, `vite`, and `vitest`.\n4. In the final stage, copy the Node.js binaries and the globally installed `node_modules` from the builder stage.\n5. Set environment variables (`NODE_PATH`, `PATH`, `NPM_CONFIG_CACHE`).\n6. Create and set permissions for the npm cache directory for the `ci-user`.",
+        "testStrategy": "Build the `ci-npm` image. Run a container and verify `node --version` and `npm --version`. Check that global packages like `vite` and `tsc` are available on the PATH. Test creating and installing dependencies for a simple React project.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Develop Combined `ci-go-npm` Full-Stack Image",
+        "description": "Create the `ci-go-npm` image by combining the Go and Node.js toolchains into the `ci-base` image. This image will support full-stack development for projects like `pi-controller`.",
+        "details": "Create a Dockerfile for `ci-go-npm` that:\n1. Uses `ci-base:v1.0` as the final base.\n2. Uses two separate builder stages: one based on `golang:1.24` and another on `node:20`.\n3. Copies the Go toolchain and binaries from the Go builder stage.\n4. Copies the Node.js binaries and global modules from the Node builder stage.\n5. Sets up all necessary environment variables for both Go and Node.js.\n6. Ensures all user-writable directories (`/go`, cache directories) are owned by `ci-user`.",
+        "testStrategy": "Build the image and run a container. Verify that both `go version` and `node --version` report the correct versions. Test a workflow that involves both, such as generating protobufs (`protoc`) and then running a build script (`npm run build`).",
+        "priority": "medium",
+        "dependencies": [
+          3,
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create `ci-go-npm/Dockerfile` and Define Go Builder Stage",
+            "description": "Create a new Dockerfile at `ci-go-npm/Dockerfile`. Define the first builder stage named `go-builder` based on `golang:1.24`. This stage should be responsible for preparing the Go toolchain and installing the necessary Go-based tools (`protoc-gen-go`, `protoc-gen-go-grpc`, `golangci-lint`) consistent with the `ci-go` image.",
+            "dependencies": [],
+            "details": "In `ci-go-npm/Dockerfile`, add the following stage:\n```dockerfile\n# Go builder stage\nFROM golang:1.24-bullseye AS go-builder\n\n# Install Go tools\nRUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1 && \\\n    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.4.0 && \\\n    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1\n```",
+            "status": "pending",
+            "testStrategy": "Ensure the Dockerfile is created in the correct location (`ci-go-npm/`) and that this stage builds successfully without errors."
+          },
+          {
+            "id": 2,
+            "title": "Add Node.js Builder Stage to Dockerfile",
+            "description": "Add a second builder stage to `ci-go-npm/Dockerfile` named `node-builder`. This stage will be based on `node:20-bullseye` and will be used to install the global npm packages required for frontend development, mirroring the setup in the `ci-npm` image.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Append the `node-builder` stage to the Dockerfile:\n```dockerfile\n# Node.js builder stage\nFROM node:20-bullseye AS node-builder\n\n# Install global npm packages\nRUN npm install -g typescript prettier eslint vite vitest\n```",
+            "status": "pending",
+            "testStrategy": "Perform a partial build of the Dockerfile to confirm both the `go-builder` and `node-builder` stages complete successfully."
+          },
+          {
+            "id": 3,
+            "title": "Implement Final Stage and Copy Go/Node Artifacts",
+            "description": "Define the final build stage using `ci-base:v1.0` as the base image. Use multi-stage `COPY` commands to bring the Go toolchain and binaries from the `go-builder` stage, and the Node.js binaries and global modules from the `node-builder` stage into the final image.",
+            "dependencies": [
+              "5.1",
+              "5.2"
+            ],
+            "details": "Add the final stage and copy instructions:\n```dockerfile\n# Final image\nFROM ci-base:v1.0\n\n# Copy Go toolchain and binaries from go-builder\nCOPY --from=go-builder /usr/local/go /usr/local/go\nCOPY --from=go-builder /go/bin /go/bin\n\n# Copy Node.js and global modules from node-builder\nCOPY --from=node-builder /usr/local/bin /usr/local/bin\nCOPY --from=node-builder /usr/local/lib/node_modules /usr/local/lib/node_modules\n```",
+            "status": "pending",
+            "testStrategy": "Build the image and inspect its layers to confirm that the Go and Node.js files are copied to the correct locations."
+          },
+          {
+            "id": 4,
+            "title": "Configure Combined Environment Variables for Go and Node.js",
+            "description": "In the final stage, set all necessary environment variables to make both toolchains accessible. This includes creating a combined `PATH` that prioritizes the newly installed binaries, and setting specific paths for `GOPATH`, `GOCACHE`, `NODE_PATH`, and `NPM_CONFIG_CACHE`.",
+            "dependencies": [
+              "5.3"
+            ],
+            "details": "Add the `ENV` instructions to the final stage:\n```dockerfile\n# Set environment variables for Go and Node.js\nENV GOPATH=\"/go\"\nENV GOCACHE=\"/home/ci-user/.cache/go-build\"\nENV NODE_PATH=\"/usr/local/lib/node_modules\"\nENV NPM_CONFIG_CACHE=\"/home/ci-user/.npm\"\nENV PATH=\"/go/bin:/usr/local/go/bin:/usr/local/bin:${PATH}\"\nENV CGO_ENABLED=0\n```",
+            "status": "pending",
+            "testStrategy": "Build the image, run a container, and execute `echo $PATH`, `go env`, and `npm config list` to verify all environment variables are set correctly."
+          },
+          {
+            "id": 5,
+            "title": "Create and Secure User-Writable Directories",
+            "description": "Create all directories required by Go and npm for packages and caches. Use a single `RUN` command with `chown -R ci-user:ci-user` to set the correct ownership for all these directories, ensuring the non-root `ci-user` has the necessary permissions.",
+            "dependencies": [
+              "5.4"
+            ],
+            "details": "Add the final `RUN` command to create and set permissions for user-specific directories:\n```dockerfile\n# Create and set permissions for user-writable directories\nRUN mkdir -p \"/go\" \"/home/ci-user/.npm\" \"/home/ci-user/.cache/go-build\" && \\\n    chown -R ci-user:ci-user \"/go\" \"/home/ci-user/.npm\" \"/home/ci-user/.cache\"\n\nUSER ci-user\nWORKDIR /workspace\n```",
+            "status": "pending",
+            "testStrategy": "Build the image, run a container as `ci-user`, and verify that the user can write to `/go`, `/home/ci-user/.npm`, and `/home/ci-user/.cache/go-build` by running commands like `touch /go/testfile` and `npm cache verify`."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Expand GitHub Actions to Build All Specialized Images",
+        "description": "Update the GitHub Actions workflow to build and publish all specialized images (`ci-go`, `ci-npm`, `ci-go-npm`) in addition to `ci-base`, using a matrix strategy for efficiency.",
+        "details": "Modify the `.github/workflows/build-images.yml` file:\n1. Introduce a `matrix` strategy to define the different images to be built (base, go, npm, go-npm).\n2. For each matrix entry, specify the Dockerfile path and the final image name.\n3. Ensure each image is built for both `linux/amd64` and `linux/arm64` and pushed to GHCR with the correct version and `latest` tags.",
+        "testStrategy": "Trigger the workflow and verify that four parallel build jobs are created. Check GHCR to confirm that all four images (`ci-base`, `ci-go`, `ci-npm`, `ci-go-npm`) are published with multi-arch manifests and the correct tags.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Implement Comprehensive Makefile for Development Workflows",
+        "description": "Create a `Makefile` that automates common development tasks such as dependency installation, running development servers with hot reloading, and running tests, as specified in the PRD.",
+        "details": "Create a `Makefile` in the project root with the following targets:\n1. Dependency management: `deps`, `web-deps`, `dev-deps`.\n2. Hot-reloading dev servers: `api-dev` (using `air`), `web-dev` (`npm run dev`), and a combined `dev-all`.\n3. Testing: `test-api`, `test-web`, and `test-all`.\n4. Code quality: `fmt`, `lint-api`, `lint-web`, `lint`.\n5. Protobuf generation: `proto-gen`, `proto-clean`, `proto`.\n6. Add a `help` target to display available commands.",
+        "testStrategy": "Execute each make target locally (within a dev container) to ensure it performs the correct action. For example, run `make dev-all` and verify that both the Go and React dev servers start correctly. Run `make test-all` and confirm that both test suites are executed.",
+        "priority": "high",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Integrate Makefile with Docker for Containerized Workflows",
+        "description": "Add Makefile targets that simplify running development, build, and test tasks within the appropriate Docker container, providing a consistent environment for all developers.",
+        "details": "Add the following targets to the `Makefile`:\n1. `docker-dev`: Runs the `ci-go-npm` container interactively, mounting the current directory, forwarding ports (3000, 8080), and using named volumes for caches, then executes `make dev-all`.\n2. `docker-build`: Runs the container non-interactively to execute `make build-all`.\n3. `docker-test`: Runs the container non-interactively to execute `make test-all`.",
+        "testStrategy": "From the host machine, run `make docker-dev` and verify that a container starts and the hot-reload servers are running and accessible. Run `make docker-build` and check for build artifacts in the `dist/` directory on the host. Run `make docker-test` and check the command output for test results.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Implement Build, Security, and Pi Deployment Makefile Targets",
+        "description": "Complete the `Makefile` by adding targets for production builds, security scanning, and automated deployment to a Raspberry Pi.",
+        "details": "Add the following targets to the `Makefile`:\n1. Build targets: `build-api`, `build-web`, and `build-pi` for ARM64 cross-compilation.\n2. Security targets: `security-api` (`govulncheck`, `gosec`), `security-web` (`npm audit`), and a comprehensive `security-scan` (`osv-scanner`, `syft`).\n3. Deployment targets: `package-pi` to bundle the binary and service files, and `deploy-pi` to `scp` the files to a target Pi and restart the `systemd` service. The deploy target must accept a `DEPLOY_TARGET` variable.",
+        "testStrategy": "Run `make build-pi` and verify an ARM64 binary is created. Run `make security-scan` and check for the generated SBOM and vulnerability reports. For deployment, mock the `scp` and `ssh` commands to verify the correct commands would be executed, or test against an actual Raspberry Pi if available.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Create Comprehensive Documentation and Usage Examples",
+        "description": "Write detailed documentation in the `README.md` file, explaining the project's purpose, the available images, and how to use them for local development, CI, and deployment.",
+        "details": "The `README.md` should include:\n1. An overview of the layered image architecture.\n2. A table of available images, their purpose, and links to GHCR.\n3. Step-by-step instructions for the local development workflow using `make docker-dev`.\n4. An example GitHub Actions CI pipeline that uses one of the images to lint, test, and build a project.\n5. Instructions for the Raspberry Pi deployment workflow using `make deploy-pi`.\n6. A reference for all major `Makefile` targets.",
+        "testStrategy": "Have a new team member follow the documentation from start to finish to set up a project, run the local development environment, and understand the CI/CD process. Their feedback will be used to refine the documentation for clarity and completeness.",
+        "priority": "low",
+        "dependencies": [
+          2,
+          8,
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-09-07T03:36:44.619Z",
+      "updated": "2025-09-07T03:36:44.619Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
