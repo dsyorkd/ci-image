@@ -59,7 +59,7 @@ jobs:
           # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
-          claude_args: '--allowed-tools "Bash(gh pr:*),Bash(gh issue:*),Read,Write,Edit,Grep,Glob" --timeout 300'
+          claude_args: '--allowed-tools "Bash(gh pr:*),Bash(gh issue:*),Read,Write,Edit,Grep,Glob"'
 
       - name: Handle missing token
         if: steps.check-token.outputs.claude_token_available == 'false'

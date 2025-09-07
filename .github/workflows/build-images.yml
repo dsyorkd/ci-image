@@ -39,7 +39,7 @@ jobs:
             org.opencontainers.image.vendor=spenceryork
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./docker/ci-base
           platforms: linux/amd64,linux/arm64
