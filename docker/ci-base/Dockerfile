@@ -44,6 +44,7 @@ RUN apt-get update && \
         make \
         git \
         curl \
+        wget \
         sudo \
         bash \
         build-essential \

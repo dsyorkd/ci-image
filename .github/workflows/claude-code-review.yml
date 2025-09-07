@@ -11,11 +11,8 @@ on:
 
 jobs:
   claude-review:
-    # Only run on external contributions or when specifically requested
-    if: |
-      github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' ||
-      github.event.pull_request.author_association == 'CONTRIBUTOR' ||
-      contains(github.event.pull_request.body, '@claude-review')
+    # Only run when specifically requested via comment in PR body
+    if: contains(github.event.pull_request.body, '@claude-review')
     
     runs-on: ubuntu-latest
     permissions:
