@@ -1,10 +1,10 @@
 # CI Failure Analysis
 
 **Workflow:** Claude Code Review
-**Run Number:** 11
-**Commit:** b140e7e09b952b639d64c927cc027105c1743ae9
-**Branch:** renovate/docker-build-push-action-6.x
-**Failure Time:** 2025-09-07T17:36:31.151Z
+**Run Number:** 15
+**Commit:** 7667504cc355ca7b09ec76e5521a0aa335147b1f
+**Branch:** renovate/actions-setup-python-6.x
+**Failure Time:** 2025-09-07T17:55:20.279Z
 
 ## Failed Jobs Analysis
 
