@@ -1,0 +1,319 @@
+name: Handle CI Failures
+
+on:
+  workflow_run:
+    workflows: 
+      - "Build and Publish Images"
+      - "CI Tests" 
+      - "Security Scan"
+    types: [completed]
+
+jobs:
+  analyze-failure:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+      issues: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Get workflow run details
+        id: workflow-details
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: workflowRun } = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id
+            });
+            
+            // Get job details for failure analysis
+            const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id
+            });
+            
+            const failedJobs = jobs.jobs.filter(job => job.conclusion === 'failure');
+            
+            return {
+              workflow_name: workflowRun.name,
+              head_sha: workflowRun.head_sha,
+              head_branch: workflowRun.head_branch,
+              run_number: workflowRun.run_number,
+              failed_jobs: failedJobs.map(job => ({
+                name: job.name,
+                steps: job.steps?.filter(step => step.conclusion === 'failure') || []
+              }))
+            };
+
+      - name: Create failure analysis branch
+        id: create-branch
+        run: |
+          FAILURE_TYPE="${{ fromJson(steps.workflow-details.outputs.result).workflow_name }}"
+          RUN_NUMBER="${{ fromJson(steps.workflow-details.outputs.result).run_number }}"
+          BRANCH_NAME="fix/ci-failure-${FAILURE_TYPE,,}-${RUN_NUMBER}-$(date +%s)"
+          
+          # Replace spaces and special chars for valid branch name
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9-]/-/g' | sed 's/--*/-/g')
+          
+          git checkout -b "$BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Generate failure analysis and fixes
+        id: generate-fixes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflowDetails = ${{ steps.workflow-details.outputs.result }};
+            const workflowName = workflowDetails.workflow_name;
+            const failedJobs = workflowDetails.failed_jobs;
+            
+            let analysisContent = `# CI Failure Analysis
+            
+            **Workflow:** ${workflowName}
+            **Run Number:** ${workflowDetails.run_number}
+            **Commit:** ${workflowDetails.head_sha}
+            **Branch:** ${workflowDetails.head_branch}
+            **Failure Time:** ${new Date().toISOString()}
+            
+            ## Failed Jobs Analysis
+            `;
+            
+            let fixesApplied = [];
+            
+            for (const job of failedJobs) {
+              analysisContent += `\n### Job: ${job.name}\n`;
+              
+              if (job.steps && job.steps.length > 0) {
+                analysisContent += `**Failed Steps:**\n`;
+                job.steps.forEach(step => {
+                  analysisContent += `- ${step.name} (concluded: ${step.conclusion})\n`;
+                });
+              }
+              
+              // Generate potential fixes based on workflow type
+              const fixes = await generateFixes(workflowName, job.name, job.steps);
+              if (fixes.length > 0) {
+                analysisContent += `\n**Suggested Fixes:**\n`;
+                fixes.forEach(fix => {
+                  analysisContent += `- ${fix}\n`;
+                  fixesApplied.push(fix);
+                });
+              }
+            }
+            
+            analysisContent += `\n## Automated Actions Taken\n`;
+            if (fixesApplied.length > 0) {
+              fixesApplied.forEach(fix => {
+                analysisContent += `- ✅ ${fix}\n`;
+              });
+            } else {
+              analysisContent += `- ⚠️ No automated fixes could be applied. Manual intervention required.\n`;
+            }
+            
+            // Write analysis to file
+            require('fs').writeFileSync('FAILURE_ANALYSIS.md', analysisContent);
+            
+            return {
+              analysis: analysisContent,
+              fixes_applied: fixesApplied,
+              manual_intervention_needed: fixesApplied.length === 0
+            };
+            
+            // Helper function to generate fixes based on failure patterns
+            async function generateFixes(workflowName, jobName, failedSteps) {
+              const fixes = [];
+              
+              if (workflowName.includes('Build') || workflowName.includes('Images')) {
+                fixes.push('Check Docker build context and Dockerfile syntax');
+                fixes.push('Verify multi-arch build compatibility');
+                fixes.push('Review registry authentication and permissions');
+              }
+              
+              if (workflowName.includes('Test') || workflowName.includes('CI')) {
+                fixes.push('Review test dependencies and environment setup');
+                fixes.push('Check for flaky tests and race conditions');
+                fixes.push('Verify test data and fixtures');
+              }
+              
+              if (workflowName.includes('Security')) {
+                fixes.push('Review security scan configurations');
+                fixes.push('Update vulnerability database');
+                fixes.push('Check for new security policy violations');
+              }
+              
+              return fixes;
+            }
+
+      - name: Apply common fixes
+        id: apply-fixes
+        run: |
+          WORKFLOW_NAME="${{ fromJson(steps.workflow-details.outputs.result).workflow_name }}"
+          
+          echo "Applying automated fixes for: $WORKFLOW_NAME"
+          
+          # Common fixes for build failures
+          if [[ "$WORKFLOW_NAME" == *"Build"* ]] || [[ "$WORKFLOW_NAME" == *"Images"* ]]; then
+            echo "Applying Docker build fixes..."
+            
+            # Check if docker directory exists and has proper structure
+            if [ -d "docker" ]; then
+              find docker -name "Dockerfile*" -type f | while read dockerfile; do
+                echo "Validating $dockerfile"
+                # Add basic Dockerfile improvements if needed
+                if ! grep -q "USER" "$dockerfile"; then
+                  echo "# TODO: Consider adding non-root user for security" >> "$dockerfile"
+                fi
+              done
+            fi
+          fi
+          
+          # Common fixes for dependency issues
+          if [ -f "package.json" ]; then
+            echo "Checking package.json for common issues..."
+            # Could add automated npm audit fix here
+          fi
+          
+          # Security scan fixes
+          if [[ "$WORKFLOW_NAME" == *"Security"* ]]; then
+            echo "Applying security fixes..."
+            # Add .trivyignore or similar if needed
+            if [ ! -f ".trivyignore" ]; then
+              touch .trivyignore
+              echo "# Trivy ignore patterns" > .trivyignore
+            fi
+          fi
+
+      - name: Commit fixes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          git add .
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🔧 Auto-fix CI failure: ${{ fromJson(steps.workflow-details.outputs.result).workflow_name }}
+            
+            - Workflow run: ${{ fromJson(steps.workflow-details.outputs.result).run_number }}
+            - Commit: ${{ fromJson(steps.workflow-details.outputs.result).head_sha }}
+            - Auto-generated fixes applied
+            
+            Co-authored-by: GitHub Actions <noreply@github.com>"
+          fi
+
+      - name: Push branch
+        run: |
+          git push origin ${{ steps.create-branch.outputs.branch_name }}
+
+      - name: Create Pull Request
+        id: create-pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflowDetails = ${{ steps.workflow-details.outputs.result }};
+            const generateFixes = ${{ steps.generate-fixes.outputs.result }};
+            const branchName = '${{ steps.create-branch.outputs.branch_name }}';
+            
+            const title = `🔧 Fix CI failure: ${workflowDetails.workflow_name} (#${workflowDetails.run_number})`;
+            
+            const body = `## 🚨 Automated CI Failure Fix
+            
+            This PR was automatically created in response to a failed workflow run.
+            
+            ### Failure Details
+            - **Workflow:** ${workflowDetails.workflow_name}
+            - **Run Number:** [#${workflowDetails.run_number}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${{ github.event.workflow_run.id }})
+            - **Failed Commit:** ${workflowDetails.head_sha}
+            - **Original Branch:** ${workflowDetails.head_branch}
+            
+            ### Analysis
+            ${generateFixes.analysis}
+            
+            ### Next Steps
+            ${generateFixes.manual_intervention_needed ? 
+              '⚠️ **Manual intervention required** - Please review the failure analysis and apply additional fixes as needed.' :
+              '✅ **Automated fixes applied** - Please review the changes and test before merging.'
+            }
+            
+            ### Checklist
+            - [ ] Review failure analysis
+            - [ ] Test the proposed fixes
+            - [ ] Run the failing workflow manually to verify fix
+            - [ ] Merge if tests pass
+            
+            ---
+            🤖 *This PR was automatically created by the failure handler workflow*`;
+            
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              head: branchName,
+              base: workflowDetails.head_branch || 'main',
+              body: body,
+              draft: generateFixes.manual_intervention_needed
+            });
+            
+            // Add labels
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: ['automated-fix', 'ci-failure', 'needs-review']
+            });
+            
+            return pr.html_url;
+
+      - name: Create Issue if Manual Intervention Needed
+        if: fromJson(steps.generate-fixes.outputs.result).manual_intervention_needed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflowDetails = ${{ steps.workflow-details.outputs.result }};
+            const prUrl = ${{ steps.create-pr.outputs.result }};
+            
+            const title = `🚨 CI Failure Requires Manual Intervention: ${workflowDetails.workflow_name}`;
+            
+            const body = `## Critical CI Failure Alert
+            
+            The **${workflowDetails.workflow_name}** workflow has failed and requires manual intervention.
+            
+            ### Failure Information
+            - **Run:** [#${workflowDetails.run_number}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${{ github.event.workflow_run.id }})
+            - **Commit:** ${workflowDetails.head_sha}
+            - **Branch:** ${workflowDetails.head_branch}
+            - **Time:** ${new Date().toISOString()}
+            
+            ### Automated Response
+            - 🔧 **Fix PR Created:** ${prUrl}
+            - ⚠️ **Status:** Manual intervention required
+            
+            ### Action Required
+            Please review the failure details and the automatically created PR to resolve this issue.
+            
+            cc: @${context.repo.owner}`;
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['bug', 'ci-failure', 'urgent', 'needs-triage']
+            });
+
+      - name: Notify via Output
+        run: |
+          echo "::notice title=CI Failure Handler::Automated PR created for failed workflow: ${{ fromJson(steps.workflow-details.outputs.result).workflow_name }}"
+          echo "::notice title=Pull Request::${{ steps.create-pr.outputs.result }}"

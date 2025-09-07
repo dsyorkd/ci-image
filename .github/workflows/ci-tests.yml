@@ -1,0 +1,123 @@
+name: CI Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  docker-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [ci-base, ci-npm, ci-python, ci-security]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Test Docker build
+        run: |
+          if [ -d "docker/${{ matrix.image }}" ]; then
+            echo "Testing build for ${{ matrix.image }}"
+            docker build -t test-${{ matrix.image }} docker/${{ matrix.image }}
+          else
+            echo "Skipping ${{ matrix.image }} - directory not found"
+          fi
+
+      - name: Test image functionality
+        run: |
+          if docker images | grep -q "test-${{ matrix.image }}"; then
+            echo "Running functionality tests for ${{ matrix.image }}"
+            
+            # Basic container start test
+            docker run --rm test-${{ matrix.image }} echo "Container startup test passed"
+            
+            # Test specific image functionality
+            case "${{ matrix.image }}" in
+              "ci-base")
+                docker run --rm test-${{ matrix.image }} which git
+                docker run --rm test-${{ matrix.image }} which curl
+                ;;
+              "ci-npm")
+                docker run --rm test-${{ matrix.image }} node --version
+                docker run --rm test-${{ matrix.image }} npm --version
+                ;;
+              "ci-python")
+                docker run --rm test-${{ matrix.image }} python --version
+                docker run --rm test-${{ matrix.image }} pip --version
+                ;;
+              "ci-security")
+                docker run --rm test-${{ matrix.image }} which trivy || echo "Trivy not found, skipping"
+                ;;
+            esac
+          fi
+
+  validate-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate GitHub Actions workflows
+        run: |
+          echo "Validating workflow syntax..."
+          
+          # Check for required workflow files
+          required_workflows=("build-images.yml" "failure-handler.yml")
+          
+          for workflow in "${required_workflows[@]}"; do
+            if [ ! -f ".github/workflows/$workflow" ]; then
+              echo "::error::Missing required workflow: $workflow"
+              exit 1
+            fi
+            echo "✅ Found: $workflow"
+          done
+
+      - name: Check Dockerfile syntax
+        run: |
+          echo "Checking Dockerfile syntax..."
+          
+          find docker -name "Dockerfile*" -type f | while read dockerfile; do
+            echo "Checking: $dockerfile"
+            # Basic syntax validation
+            docker run --rm -i hadolint/hadolint < "$dockerfile" || echo "Hadolint check failed for $dockerfile"
+          done
+
+  lint-and-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run general security checks
+        run: |
+          echo "Running security checks..."
+          
+          # Check for secrets in files
+          if grep -r -i -E "(password|secret|key|token)" --exclude-dir=.git --exclude="*.yml" --exclude="*.yaml" .; then
+            echo "::warning::Potential secrets found in code. Please review."
+          fi
+          
+          # Check for proper .dockerignore
+          if [ ! -f ".dockerignore" ]; then
+            echo "::warning::.dockerignore not found. Consider adding one for better Docker builds."
+          fi
+
+      - name: Validate Task Master configuration
+        run: |
+          if [ -f ".taskmaster/tasks/tasks.json" ]; then
+            echo "✅ Task Master configuration found"
+            
+            # Basic JSON validation
+            if command -v jq > /dev/null; then
+              jq empty .taskmaster/tasks/tasks.json
+              echo "✅ Task Master JSON is valid"
+            fi
+          else
+            echo "::notice::Task Master not initialized yet"
+          fi

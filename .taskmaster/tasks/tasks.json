@@ -9,15 +9,15 @@
         "testStrategy": "Verify by running the built image and checking for the presence and correct versions of all installed tools (e.g., `git --version`, `protoc --version`, `osv-scanner --version`). Confirm that the default user is `ci-user` and that it can execute commands in the `/workspace` directory. Test `sudo apt-get update` to verify sudo permissions.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
             "title": "Initialize Dockerfile and Install Core System Packages",
             "description": "Create the initial Dockerfile at `docker/ci-base/Dockerfile`, set `ubuntu:22.04` as the base, and install essential system packages required for the CI environment.",
             "dependencies": [],
-            "details": "In a new directory `docker/ci-base`, create a `Dockerfile`. Start with `FROM ubuntu:22.04`. Use a single `RUN` instruction to update apt, install `make`, `git`, `curl`, `sudo`, `bash`, `build-essential`, and `protobuf-compiler`, and then clean up the apt cache to minimize layer size. Set `DEBIAN_FRONTEND=noninteractive` to prevent interactive prompts during the build.",
-            "status": "pending",
+            "details": "In a new directory `docker/ci-base`, create a `Dockerfile`. Start with `FROM ubuntu:22.04`. Use a single `RUN` instruction to update apt, install `make`, `git`, `curl`, `sudo`, `bash`, `build-essential`, and `protobuf-compiler`, and then clean up the apt cache to minimize layer size. Set `DEBIAN_FRONTEND=noninteractive` to prevent interactive prompts during the build.\n<info added on 2025-09-07T03:59:31.715Z>\nImplementation complete. Verified tool versions within the built image:\n- git: 2.34.1\n- make: 4.3\n- protoc: 3.12.4\n</info added on 2025-09-07T03:59:31.715Z>",
+            "status": "done",
             "testStrategy": "Build the Docker image locally. Run a container and execute `git --version`, `make --version`, and `protoc --version` to verify the packages are installed correctly."
           },
           {
@@ -26,7 +26,7 @@
             "description": "Add a build stage to download and install the security tools (`govulncheck`, `osv-scanner`, `syft`, `gosec`), ensuring the correct binaries are fetched for both `linux/amd64` and `linux/arm64` architectures.",
             "dependencies": [],
             "details": "In the `docker/ci-base/Dockerfile`, add `ARG` declarations for `TARGETARCH`. Use a multi-line `RUN` command that inspects the value of `TARGETARCH` to download the appropriate pre-compiled binaries for each security tool from their official release pages. Make the downloaded binaries executable and move them to `/usr/local/bin`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Perform a local build for a specific architecture (e.g., `docker build --platform linux/amd64 ...`). Run the resulting image and execute each security tool with its `--version` flag (e.g., `osv-scanner --version`) to confirm it's installed and executable."
           },
           {
@@ -35,7 +35,7 @@
             "description": "Enhance image security by creating a dedicated non-root user named `ci-user` and granting it passwordless `sudo` privileges for package management tasks.",
             "dependencies": [],
             "details": "Add a `RUN` instruction to the Dockerfile to execute `useradd` to create the `ci-user` with a home directory. Then, add this user to the `sudo` group. Create a new file in `/etc/sudoers.d/` to grant `ci-user` passwordless `sudo` access (e.g., `echo 'ci-user ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/ci-user`).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run a container as the root user. Execute `su - ci-user` to switch to the new user. Verify that `sudo apt-get update` can be run without a password prompt."
           },
           {
@@ -44,7 +44,7 @@
             "description": "Establish the default working directory for CI jobs, assign correct ownership to `ci-user`, and set `ci-user` as the default user for the image.",
             "dependencies": [],
             "details": "In the Dockerfile, add a `RUN` instruction to create the `/workspace` directory and use `chown` to set its owner to `ci-user:ci-user`. Following this, add the `WORKDIR /workspace` instruction to set it as the default directory. Finally, use the `USER ci-user` instruction to ensure subsequent commands and container sessions run as the non-root user.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run a container from the built image. Execute `whoami` to confirm the user is `ci-user`. Execute `pwd` to confirm the current directory is `/workspace`. Attempt to create a file with `touch test.txt` to verify write permissions."
           },
           {
@@ -53,7 +53,7 @@
             "description": "To facilitate local development and testing before the full CI/CD pipeline is implemented, create a `Makefile` with a target to build the `ci-base` Docker image.",
             "dependencies": [],
             "details": "Based on the plan for Task 7, create a preliminary `Makefile` in the project root. Add a target named `build-ci-base`. This target should execute the `docker build` command, pointing to `docker/ci-base/Dockerfile`, and tag the resulting image as `ghcr.io/your-org/ci-base:latest` (using a placeholder for the org/repo name).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "From the project root, run `make build-ci-base`. Verify that the command executes successfully and that a new Docker image with the specified tag is present in the local image repository by running `docker images`."
           }
         ]
@@ -68,8 +68,64 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Initial GitHub Actions Workflow File",
+            "description": "Create the basic structure for the build and publish workflow. This includes creating the new file at `.github/workflows/build-images.yml`, defining its name, and setting the trigger to run on pushes to the `main` branch.",
+            "dependencies": [],
+            "details": "In the `.github/workflows/` directory, create a new file named `build-images.yml`. Define the `name` of the workflow as 'Build and Publish Images'. Configure the `on` trigger for `push` events on the `main` branch. Set up a single job named `build-and-push-ci-base` that runs on `ubuntu-latest`.\n<info added on 2025-09-07T05:38:31.789Z>\nWithin the `build-and-push-ci-base` job, add the steps required to set up the multi-architecture build environment. Use the `docker/setup-qemu-action` to enable processor emulation, followed by the `docker/setup-buildx-action` to create and bootstrap a new builder instance.\n</info added on 2025-09-07T05:38:31.789Z>",
+            "status": "done",
+            "testStrategy": "Create a new branch, add the workflow file, commit, and push. Verify that the action does not trigger. Merge the branch to `main` and verify that the action is triggered and runs successfully (even if it has no steps yet)."
+          },
+          {
+            "id": 2,
+            "title": "Configure Multi-Architecture Build Environment",
+            "description": "Add the necessary steps to the workflow to set up the runner for multi-architecture builds using QEMU and Docker Buildx.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Within the `build-and-push-ci-base` job in `build-images.yml`, add two steps using community actions: one for `docker/setup-qemu-action` and another for `docker/setup-buildx-action`. This will prepare the environment for building `linux/amd64` and `linux/arm64` images.\n<info added on 2025-09-07T05:39:16.123Z>\nThe implementation used `docker/setup-qemu-action@v3` for processor emulation and `docker/setup-buildx-action@v3` to enable advanced multi-platform build features.\n</info added on 2025-09-07T05:39:16.123Z>",
+            "status": "done",
+            "testStrategy": "Push a change to the workflow file on the `main` branch. Verify that the workflow runs and the 'Set up QEMU' and 'Set up Docker Buildx' steps complete successfully in the action logs."
+          },
+          {
+            "id": 3,
+            "title": "Implement GHCR Authentication",
+            "description": "Add a step to the workflow to securely log in to the GitHub Container Registry (GHCR) before attempting to push the image.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Add a step to the `build-and-push-ci-base` job that uses the `docker/login-action@v3`. Configure it to log in to `ghcr.io`. Use the automatically generated `GITHUB_TOKEN` for authentication by setting the `username` to `${{ github.actor }}` and `password` to `${{ secrets.GITHUB_TOKEN }}`.\n<info added on 2025-09-07T05:39:47.821Z>\nAdded GHCR authentication step using docker/login-action@v3. Configured to login to ghcr.io registry using the automatically provided GITHUB_TOKEN with github.actor as username. This enables the workflow to push images to the GitHub Container Registry.\n</info added on 2025-09-07T05:39:47.821Z>",
+            "status": "done",
+            "testStrategy": "Push a change to the workflow file on the `main` branch. Check the action logs to confirm that the 'Login to GHCR' step completes without any authentication errors."
+          },
+          {
+            "id": 4,
+            "title": "Define Image Metadata and Tagging Strategy",
+            "description": "Add a step to dynamically generate image tags based on the project's versioning scheme. For the initial implementation, this will be a static version and the 'latest' tag.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Use the `docker/metadata-action@v5` to generate tags for the image. Configure the action to produce the image name `ghcr.io/${{ github.repository }}/ci-base`. Set up the tagging to generate a static tag `v1.0.0` and the `latest` tag for pushes to the main branch. Give this step an `id` (e.g., `meta`) so its output can be referenced later.\n<info added on 2025-09-07T05:40:32.864Z>\nThe following YAML snippet was added to the GitHub Actions workflow to implement this:\n```yaml\n- name: Extract Docker metadata\n  id: meta\n  uses: docker/metadata-action@v5\n  with:\n    images: ghcr.io/${{ github.repository }}/ci-base\n    tags: |\n      type=raw,value=v1.0.0\n      type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}\n```\n</info added on 2025-09-07T05:40:32.864Z>",
+            "status": "done",
+            "testStrategy": "Push a change to the workflow file on the `main` branch. Inspect the action logs for the 'Extract Docker metadata' step and verify that its output correctly lists the tags `ghcr.io/your-org/ci-image/ci-base:v1.0.0` and `ghcr.io/your-org/ci-image/ci-base:latest`."
+          },
+          {
+            "id": 5,
+            "title": "Build and Push the `ci-base` Multi-Arch Image",
+            "description": "Implement the final step in the workflow to build the `ci-base` Docker image for multiple architectures and push it to GHCR with the defined tags.",
+            "dependencies": [
+              "2.2",
+              "2.3",
+              "2.4"
+            ],
+            "details": "Add a step using `docker/build-push-action@v5`. Configure it with the following parameters:\n- `context`: `./ci-base`\n- `push`: `true`\n- `tags`: `${{ steps.meta.outputs.tags }}`\n- `labels`: `${{ steps.meta.outputs.labels }}`\n- `platforms`: `linux/amd64,linux/arm64`\n- `cache-from`: `type=gha`\n- `cache-to`: `type=gha,mode=max`\n<info added on 2025-09-07T05:41:10.560Z>\nAdded the final build and push step using `docker/build-push-action@v5`. Configured with context './docker/ci-base', multi-platform support for linux/amd64,linux/arm64, push enabled, using metadata outputs for tags and labels, and GitHub Actions caching enabled. The workflow is now complete and ready to build and publish the ci-base image to GHCR.\n</info added on 2025-09-07T05:41:10.560Z>",
+            "status": "done",
+            "testStrategy": "Push a commit that modifies `ci-base/Dockerfile` to the `main` branch. Verify the entire workflow completes successfully. Navigate to the repository's 'Packages' section on GitHub and confirm that the `ci-base` image exists with both `v1.0.0` and `latest` tags. Inspect the image manifest to ensure it lists both `linux/amd64` and `linux/arm64` architectures."
+          }
+        ]
       },
       {
         "id": 3,
@@ -81,7 +137,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -94,7 +150,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -108,7 +164,7 @@
           3,
           4
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -116,7 +172,7 @@
             "description": "Create a new Dockerfile at `ci-go-npm/Dockerfile`. Define the first builder stage named `go-builder` based on `golang:1.24`. This stage should be responsible for preparing the Go toolchain and installing the necessary Go-based tools (`protoc-gen-go`, `protoc-gen-go-grpc`, `golangci-lint`) consistent with the `ci-go` image.",
             "dependencies": [],
             "details": "In `ci-go-npm/Dockerfile`, add the following stage:\n```dockerfile\n# Go builder stage\nFROM golang:1.24-bullseye AS go-builder\n\n# Install Go tools\nRUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1 && \\\n    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.4.0 && \\\n    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1\n```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Ensure the Dockerfile is created in the correct location (`ci-go-npm/`) and that this stage builds successfully without errors."
           },
           {
@@ -127,7 +183,7 @@
               "5.1"
             ],
             "details": "Append the `node-builder` stage to the Dockerfile:\n```dockerfile\n# Node.js builder stage\nFROM node:20-bullseye AS node-builder\n\n# Install global npm packages\nRUN npm install -g typescript prettier eslint vite vitest\n```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Perform a partial build of the Dockerfile to confirm both the `go-builder` and `node-builder` stages complete successfully."
           },
           {
@@ -139,7 +195,7 @@
               "5.2"
             ],
             "details": "Add the final stage and copy instructions:\n```dockerfile\n# Final image\nFROM ci-base:v1.0\n\n# Copy Go toolchain and binaries from go-builder\nCOPY --from=go-builder /usr/local/go /usr/local/go\nCOPY --from=go-builder /go/bin /go/bin\n\n# Copy Node.js and global modules from node-builder\nCOPY --from=node-builder /usr/local/bin /usr/local/bin\nCOPY --from=node-builder /usr/local/lib/node_modules /usr/local/lib/node_modules\n```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Build the image and inspect its layers to confirm that the Go and Node.js files are copied to the correct locations."
           },
           {
@@ -150,7 +206,7 @@
               "5.3"
             ],
             "details": "Add the `ENV` instructions to the final stage:\n```dockerfile\n# Set environment variables for Go and Node.js\nENV GOPATH=\"/go\"\nENV GOCACHE=\"/home/ci-user/.cache/go-build\"\nENV NODE_PATH=\"/usr/local/lib/node_modules\"\nENV NPM_CONFIG_CACHE=\"/home/ci-user/.npm\"\nENV PATH=\"/go/bin:/usr/local/go/bin:/usr/local/bin:${PATH}\"\nENV CGO_ENABLED=0\n```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Build the image, run a container, and execute `echo $PATH`, `go env`, and `npm config list` to verify all environment variables are set correctly."
           },
           {
@@ -161,7 +217,7 @@
               "5.4"
             ],
             "details": "Add the final `RUN` command to create and set permissions for user-specific directories:\n```dockerfile\n# Create and set permissions for user-writable directories\nRUN mkdir -p \"/go\" \"/home/ci-user/.npm\" \"/home/ci-user/.cache/go-build\" && \\\n    chown -R ci-user:ci-user \"/go\" \"/home/ci-user/.npm\" \"/home/ci-user/.cache\"\n\nUSER ci-user\nWORKDIR /workspace\n```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Build the image, run a container as `ci-user`, and verify that the user can write to `/go`, `/home/ci-user/.npm`, and `/home/ci-user/.cache/go-build` by running commands like `touch /go/testfile` and `npm cache verify`."
           }
         ]
@@ -237,7 +293,7 @@
     ],
     "metadata": {
       "created": "2025-09-07T03:36:44.619Z",
-      "updated": "2025-09-07T03:36:44.619Z",
+      "updated": "2025-09-07T05:46:07.571Z",
       "description": "Tasks for master context"
     }
   }

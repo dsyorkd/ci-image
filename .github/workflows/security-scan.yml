@@ -1,0 +1,214 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  docker-security-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [ci-base, ci-npm, ci-python, ci-security]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image for scanning
+        run: |
+          if [ -d "docker/${{ matrix.image }}" ]; then
+            echo "Building ${{ matrix.image }} for security scan"
+            docker build -t scan-${{ matrix.image }} docker/${{ matrix.image }}
+          else
+            echo "Skipping ${{ matrix.image }} - directory not found"
+            echo "skip=true" >> $GITHUB_ENV
+          fi
+
+      - name: Run Trivy vulnerability scanner
+        if: env.skip != 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'scan-${{ matrix.image }}'
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.image }}.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: env.skip != 'true'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results-${{ matrix.image }}.sarif'
+          category: 'docker-${{ matrix.image }}'
+
+      - name: Run Trivy in table format for logs
+        if: env.skip != 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'scan-${{ matrix.image }}'
+          format: 'table'
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  dockerfile-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: docker/*/Dockerfile
+          format: sarif
+          output-file: hadolint-results.sarif
+          no-fail: true
+
+      - name: Upload Hadolint scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: hadolint-results.sarif
+          category: 'dockerfile-security'
+
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for package files
+        id: check-packages
+        run: |
+          has_npm=false
+          has_python=false
+          
+          if find . -name "package.json" -type f | head -1 | grep -q .; then
+            has_npm=true
+            echo "npm_found=true" >> $GITHUB_OUTPUT
+          fi
+          
+          if find . -name "requirements*.txt" -o -name "pyproject.toml" -o -name "Pipfile" | head -1 | grep -q .; then
+            has_python=true
+            echo "python_found=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node.js
+        if: steps.check-packages.outputs.npm_found == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run npm audit
+        if: steps.check-packages.outputs.npm_found == 'true'
+        run: |
+          find . -name "package.json" -type f | while read package_json; do
+            dir=$(dirname "$package_json")
+            echo "Checking npm dependencies in: $dir"
+            cd "$dir"
+            if [ -f "package-lock.json" ] || [ -f "yarn.lock" ]; then
+              npm audit --audit-level=moderate || echo "npm audit found issues in $dir"
+            fi
+            cd - > /dev/null
+          done
+
+      - name: Setup Python
+        if: steps.check-packages.outputs.python_found == 'true'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install safety
+        if: steps.check-packages.outputs.python_found == 'true'
+        run: pip install safety
+
+      - name: Run Python safety check
+        if: steps.check-packages.outputs.python_found == 'true'
+        run: |
+          find . -name "requirements*.txt" -type f | while read req_file; do
+            echo "Checking Python dependencies in: $req_file"
+            safety check -r "$req_file" || echo "Safety check found issues in $req_file"
+          done
+
+  compliance-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for required security files
+        run: |
+          echo "Checking for required security and compliance files..."
+          
+          required_files=(
+            "README.md"
+            ".gitignore"
+            "LICENSE"
+          )
+          
+          optional_files=(
+            "SECURITY.md"
+            "CODE_OF_CONDUCT.md"
+            ".dockerignore"
+            ".trivyignore"
+          )
+          
+          missing_required=()
+          missing_optional=()
+          
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              missing_required+=("$file")
+              echo "::error::Missing required file: $file"
+            else
+              echo "✅ Found required file: $file"
+            fi
+          done
+          
+          for file in "${optional_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              missing_optional+=("$file")
+              echo "::warning::Missing recommended file: $file"
+            else
+              echo "✅ Found recommended file: $file"
+            fi
+          done
+          
+          if [ ${#missing_required[@]} -gt 0 ]; then
+            echo "::error::Missing ${#missing_required[@]} required files"
+            exit 1
+          fi
+
+      - name: Validate Task Master security
+        run: |
+          if [ -d ".taskmaster" ]; then
+            echo "Checking Task Master security configuration..."
+            
+            # Check for sensitive data in task files
+            if find .taskmaster -name "*.json" -o -name "*.md" -o -name "*.txt" | xargs grep -l -i -E "(password|secret|key|token)" 2>/dev/null; then
+              echo "::warning::Potential sensitive data found in Task Master files"
+            fi
+            
+            # Validate config files
+            if [ -f ".taskmaster/config.json" ]; then
+              echo "✅ Task Master config found"
+            fi
+          fi
