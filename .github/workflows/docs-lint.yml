@@ -36,7 +36,7 @@ jobs:
           EOF
 
       - name: Lint main documentation files
-        uses: DavidAnson/markdownlint-cli2-action@v18
+        uses: DavidAnson/markdownlint-cli2-action@v20
         with:
           globs: |
             README.md
