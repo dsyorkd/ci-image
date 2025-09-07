@@ -1,5 +1,5 @@
 # Stage 1: Builder with Go for compiling Go-based security tools
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 # Prevent interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
@@ -33,7 +33,7 @@ RUN go install golang.org/x/vuln/cmd/govulncheck@latest
 RUN go install github.com/securego/gosec/v2/cmd/gosec@latest
 
 # Stage 2: Final ci-base image
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 # Prevent interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
