@@ -38,6 +38,7 @@ jobs:
           images: ghcr.io/${{ github.repository }}/ci-base
           tags: |
             type=raw,value=v1.0.0
+            type=raw,value=v1.0
             type=raw,value=latest
           labels: |
             org.opencontainers.image.title=CI Base Image
@@ -93,9 +94,8 @@ jobs:
         run: |
           echo "Waiting for ci-base image to be available in registry..."
           for i in {1..30}; do
-            if docker pull ghcr.io/${{ github.repository }}/ci-base:v1.0.0 2>/dev/null; then
+            if docker pull ghcr.io/${{ github.repository }}/ci-base:v1.0 2>/dev/null; then
               echo "✅ Base image is available"
-              docker tag ghcr.io/${{ github.repository }}/ci-base:v1.0.0 ghcr.io/${{ github.repository }}/ci-base:v1.0
               break
             fi
             echo "⏳ Attempt $i/30: Base image not yet available, waiting 10 seconds..."
@@ -109,6 +109,7 @@ jobs:
           images: ghcr.io/${{ github.repository }}/${{ matrix.image.name }}
           tags: |
             type=raw,value=v1.0.0
+            type=raw,value=v1.0
             type=raw,value=latest
           labels: |
             org.opencontainers.image.title=${{ matrix.image.title }}
@@ -162,6 +163,7 @@ jobs:
           images: ghcr.io/${{ github.repository }}/${{ matrix.image.name }}
           tags: |
             type=raw,value=v1.0.0
+            type=raw,value=v1.0
             type=raw,value=latest
           labels: |
             org.opencontainers.image.title=${{ matrix.image.title }}
