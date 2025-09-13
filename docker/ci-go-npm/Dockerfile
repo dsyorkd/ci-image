@@ -1,5 +1,5 @@
 # Stage 1: Go builder for installing Go-specific tools
-FROM golang:1.24-bullseye AS go-builder
+FROM golang:1.25-bullseye AS go-builder
 
 # Set environment variables for Go
 ENV GOOS=linux
@@ -9,12 +9,19 @@ ENV CGO_ENABLED=0
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
-# Install golangci-lint for code quality
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+# Install golangci-lint v2.4.0 for Go 1.25 compatibility
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.4.0
 
 # Install additional Go development tools
 RUN go install github.com/golang/mock/mockgen@latest
 RUN go install golang.org/x/tools/cmd/goimports@latest
+
+# Install security and testing tools needed by pi-controller
+RUN go install golang.org/x/vuln/cmd/govulncheck@latest
+RUN go install github.com/google/osv-scanner/cmd/osv-scanner@latest
+RUN go install github.com/anchore/syft/cmd/syft@latest
+RUN go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+RUN go install honnef.co/go/tools/cmd/staticcheck@latest
 
 # Stage 2: Node.js builder for installing npm global tools
 FROM node:22-bullseye AS npm-builder
@@ -46,14 +53,14 @@ FROM ghcr.io/dsyorkd/ci-image/ci-base:v1.0
 # Architecture argument for multi-platform builds
 ARG TARGETARCH
 
-# Install Go 1.24 (same version as builder for consistency)
+# Install Go 1.25 (same version as builder for consistency)
 RUN set -eux; \
     case "${TARGETARCH}" in \
         'amd64') GO_ARCH='amd64' ;; \
         'arm64') GO_ARCH='arm64' ;; \
         *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
     esac; \
-    wget -O go.tar.gz "https://go.dev/dl/go1.24.0.linux-${GO_ARCH}.tar.gz" && \
+    wget -O go.tar.gz "https://go.dev/dl/go1.25.0.linux-${GO_ARCH}.tar.gz" && \
     sudo tar -C /usr/local -xzf go.tar.gz && \
     rm go.tar.gz
 
@@ -74,6 +81,11 @@ COPY --from=go-builder /go/bin/protoc-gen-go-grpc /usr/local/bin/
 COPY --from=go-builder /go/bin/golangci-lint /usr/local/bin/
 COPY --from=go-builder /go/bin/mockgen /usr/local/bin/
 COPY --from=go-builder /go/bin/goimports /usr/local/bin/
+COPY --from=go-builder /go/bin/govulncheck /usr/local/bin/
+COPY --from=go-builder /go/bin/osv-scanner /usr/local/bin/
+COPY --from=go-builder /go/bin/syft /usr/local/bin/
+COPY --from=go-builder /go/bin/gosec /usr/local/bin/
+COPY --from=go-builder /go/bin/staticcheck /usr/local/bin/
 
 # Copy Node.js global tools from npm-builder stage
 COPY --from=npm-builder /npm-global /usr/local
@@ -106,10 +118,16 @@ USER ci-user
 RUN go version && \
     node --version && \
     npm --version && \
+    protoc --version && \
     protoc-gen-go --version && \
     protoc-gen-go-grpc --version && \
     golangci-lint version && \
     mockgen -version && \
+    govulncheck -version && \
+    osv-scanner -version && \
+    syft version && \
+    gosec -version && \
+    staticcheck -version && \
     tsc --version && \
     prettier --version && \
     eslint --version && \

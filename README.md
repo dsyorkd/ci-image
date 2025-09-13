@@ -6,7 +6,7 @@ A comprehensive Docker image ecosystem for multi-technology development workflow
 
 This project implements a **production-ready Docker image system** with shared base layers, designed to support:
 
-- **Go 1.24.x** backend development with comprehensive toolchain
+- **Go 1.25.x** backend development with comprehensive toolchain
 - **Node.js 20.x + TypeScript 5.x + React/Vite** frontend development  
 - **Multi-architecture builds** for both x86_64 and ARM64 (Raspberry Pi)
 - **Security-first approach** with vulnerability scanning, secret detection, and compliance checking
@@ -18,12 +18,12 @@ This project implements a **production-ready Docker image system** with shared b
 ### Layered Design
 ```
 ubuntu:24.04 (Base Layer)
-├── ci-base:v1.0          # System essentials + security tools (govulncheck, gosec, osv-scanner, syft)
-├── ci-go:v1.0            # Go 1.24 + protobuf + linting tools + ci-base
-├── ci-npm:v1.0           # Node.js 20 + TypeScript + React/Vite stack + ci-base
-├── ci-go-npm:v1.0        # Combined full-stack environment + ci-base
-├── ci-python:v1.0        # Python development environment (standalone)
-└── ci-security:v1.0      # Security scanning and analysis tools (standalone)
+├── ci-base:v2.0          # System essentials + security tools (govulncheck, gosec, osv-scanner, syft)
+├── ci-go:v2.0            # Go 1.25 + protobuf + linting tools + ci-base
+├── ci-npm:v2.0           # Node.js 20 + TypeScript + React/Vite stack + ci-base
+├── ci-go-npm:v2.0        # Combined full-stack environment + ci-base
+├── ci-python:v2.0        # Python development environment (standalone)
+└── ci-security:v2.0      # Security scanning and analysis tools (standalone)
 ```
 
 ### Registry Strategy
@@ -72,7 +72,7 @@ ubuntu:24.04 (Base Layer)
 
 ```bash
 # Pull the combined full-stack image
-docker pull ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+docker pull ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
 
 # Start development with hot reloading
 docker run -it --rm \
@@ -80,7 +80,7 @@ docker run -it --rm \
   -v $(pwd):/workspace \
   -v pi-controller-cache:/go/pkg/mod \
   -p 3000:3000 -p 8080:8080 \
-  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 \
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0 \
   make dev-all
 ```
 
@@ -90,7 +90,7 @@ docker run -it --rm \
 # Build for Raspberry Pi (ARM64)
 docker run --rm -v $(pwd):/workspace \
   -e GOOS=linux -e GOARCH=arm64 \
-  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 \
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0 \
   make build-pi
 
 # Deploy to Pi
@@ -101,12 +101,12 @@ make deploy-pi DEPLOY_TARGET=pi@raspberrypi.local
 
 | Image | Purpose | Key Tools | Usage |
 |-------|---------|-----------|-------|
-| `ci-base:v1.0` | Foundation with security tools | govulncheck, gosec, osv-scanner, syft | Base for other images |
-| `ci-go:v1.0` | Go development | Go 1.24, protoc-gen-go, golangci-lint, mockgen | Go-only projects |
-| `ci-npm:v1.0` | Node.js/React development | Node 20, TypeScript, Vite, Vitest, ESLint | Frontend-only projects |
-| `ci-go-npm:v1.0` | Full-stack development | Combined Go + Node.js toolchains | Combined Go + React |
-| `ci-python:v1.0` | Python development | Python runtime and tools | Python projects |
-| `ci-security:v1.0` | Security analysis | Specialized security scanning tools | Security testing |
+| `ci-base:v2.0` | Foundation with security tools | govulncheck, gosec, osv-scanner, syft | Base for other images |
+| `ci-go:v2.0` | Go development | Go 1.25, protoc-gen-go, golangci-lint v2.4.0, mockgen | Go-only projects |
+| `ci-npm:v2.0` | Node.js/React development | Node 20, TypeScript, Vite, Vitest, ESLint | Frontend-only projects |
+| `ci-go-npm:v2.0` | Full-stack development | Combined Go + Node.js toolchains | Combined Go + React |
+| `ci-python:v2.0` | Python development | Python runtime and tools | Python projects |
+| `ci-security:v2.0` | Security analysis | Specialized security scanning tools | Security testing |
 
 ## 🧪 GPIO Testing
 
@@ -116,14 +116,14 @@ make deploy-pi DEPLOY_TARGET=pi@raspberrypi.local
 # Mock GPIO testing (CI/CD safe)
 docker run --rm -v $(pwd):/workspace \
   -e GPIO_MOCK_MODE=true \
-  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 \
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0 \
   make test-gpio-mock
 
 # Real hardware testing (Pi only)
 docker run --rm -v $(pwd):/workspace \
   --device /dev/gpiomem \
   --privileged \
-  ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0 \
+  ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0 \
   make test-gpio-real
 ```
 
