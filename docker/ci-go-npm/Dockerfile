@@ -1,9 +1,16 @@
 # Stage 1: Go builder for installing Go-specific tools
-FROM golang:1.25-bullseye AS go-builder
+FROM golang:1.25-bookworm AS go-builder
 
 # Set environment variables for Go
 ENV GOOS=linux
 ENV CGO_ENABLED=0
+
+# Update packages and install security updates
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Install Protocol Buffer compiler tools for Go
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
@@ -24,19 +31,27 @@ RUN go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
 RUN go install honnef.co/go/tools/cmd/staticcheck@latest
 
 # Stage 2: Node.js builder for installing npm global tools
-FROM node:22-bullseye AS npm-builder
+FROM node:22-bookworm AS npm-builder
+
+# Update packages and install security updates
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Set Node.js environment variables
 ENV NODE_ENV=production
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 ENV NPM_CONFIG_AUDIT=false
 
-# Create a clean npm cache directory
-RUN mkdir -p /npm-global && \
+# Update npm to latest version and create clean cache directory
+RUN npm install -g npm@latest && \
+    mkdir -p /npm-global && \
     npm config set prefix /npm-global && \
     npm config set cache /npm-cache
 
-# Install global development tools
+# Install global development tools with audit fixes
 RUN npm install -g \
     typescript@latest \
     prettier@latest \
@@ -45,10 +60,11 @@ RUN npm install -g \
     vitest@latest \
     @vitejs/plugin-react@latest \
     @types/node@latest \
-    tsx@latest
+    tsx@latest && \
+    npm audit fix --force || true
 
 # Stage 3: Final ci-go-npm image extending ci-base
-FROM ghcr.io/dsyorkd/ci-image/ci-base:v1.0
+FROM ghcr.io/dsyorkd/ci-image/ci-base:v2.0
 
 # Architecture argument for multi-platform builds
 ARG TARGETARCH

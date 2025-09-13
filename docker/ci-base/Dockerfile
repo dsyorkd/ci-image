@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Go 1.22 (required for latest govulncheck)
+# Install Go 1.25 (consistent with other stages)
 ARG TARGETARCH
 RUN set -eux; \
     case "${TARGETARCH}" in \
@@ -20,7 +20,7 @@ RUN set -eux; \
         'arm64') GO_ARCH='arm64' ;; \
         *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
     esac; \
-    wget -O go.tar.gz "https://go.dev/dl/go1.22.9.linux-${GO_ARCH}.tar.gz" && \
+    wget -O go.tar.gz "https://go.dev/dl/go1.25.0.linux-${GO_ARCH}.tar.gz" && \
     tar -C /usr/local -xzf go.tar.gz && \
     rm go.tar.gz
 
@@ -38,9 +38,10 @@ FROM ubuntu:24.04
 # Prevent interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install core system packages
+# Install core system packages with security updates
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
         make \
         git \
         curl \
@@ -51,11 +52,11 @@ RUN apt-get update && \
         protobuf-compiler \
         ca-certificates && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Security tools versions
-ARG OSV_SCANNER_VERSION=1.6.0
-ARG SYFT_VERSION=v1.4.1
+# Security tools versions (updated for v2.0)
+ARG OSV_SCANNER_VERSION=1.9.0
+ARG SYFT_VERSION=v1.17.0
 
 # Architecture argument for multi-platform builds
 ARG TARGETARCH
