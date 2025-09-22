@@ -1,23 +1,23 @@
 # CI Failure Analysis
 
-**Workflow:** CI Tests
-**Run Number:** 1
-**Commit:** d02d0b841d940a4478945e8349cec4f672c7adf2
-**Branch:** main
-**Failure Time:** 2025-09-07T18:12:27.281Z
+**Workflow:** Security Scan
+**Run Number:** 45
+**Commit:** 6e872123090958e0894094982ad3ce1955c31b21
+**Branch:** renovate/hadolint-hadolint-action-3.x
+**Failure Time:** 2025-09-22T14:58:18.351Z
 
 ## Failed Jobs Analysis
 
-### Job: docker-tests (ci-npm)
+### Job: scan-dependent-images (ci-go-npm)
 **Failed Steps:**
-- Test Docker build (concluded: failure)
+- Build image for scanning (concluded: failure)
 
 **Suggested Fixes:**
-- Review test dependencies and environment setup
-- Check for flaky tests and race conditions
-- Verify test data and fixtures
+- Review security scan configurations
+- Update vulnerability database
+- Check for new security policy violations
 
 ## Automated Actions Taken
-- ✅ Review test dependencies and environment setup
-- ✅ Check for flaky tests and race conditions
-- ✅ Verify test data and fixtures
+- ✅ Review security scan configurations
+- ✅ Update vulnerability database
+- ✅ Check for new security policy violations
