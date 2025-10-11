@@ -1,5 +1,5 @@
 # Stage 1: Go builder for installing Go-specific tools
-FROM golang:1.24-bullseye AS go-builder
+FROM golang:1.25-bookworm AS go-builder
 
 # Set environment variables for Go
 ENV GOOS=linux
@@ -9,8 +9,8 @@ ENV CGO_ENABLED=0
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
-# Install golangci-lint for code quality
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+# Install golangci-lint v2.4.0 for Go 1.25 compatibility
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.4.0
 
 # Install additional Go development tools
 RUN go install github.com/golang/mock/mockgen@latest
@@ -22,14 +22,14 @@ FROM ghcr.io/dsyorkd/ci-image/ci-base:v1.0
 # Architecture argument for multi-platform builds
 ARG TARGETARCH
 
-# Install Go 1.24 (same version as builder for consistency)
+# Install Go 1.25 (same version as builder for consistency)
 RUN set -eux; \
     case "${TARGETARCH}" in \
         'amd64') GO_ARCH='amd64' ;; \
         'arm64') GO_ARCH='arm64' ;; \
         *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
     esac; \
-    wget -O go.tar.gz "https://go.dev/dl/go1.24.0.linux-${GO_ARCH}.tar.gz" && \
+    wget -O go.tar.gz "https://go.dev/dl/go1.25.0.linux-${GO_ARCH}.tar.gz" && \
     sudo tar -C /usr/local -xzf go.tar.gz && \
     rm go.tar.gz
 

@@ -152,7 +152,7 @@ make build-ci-go-npm
 ci-image/
 ├── docker/
 │   ├── ci-base/Dockerfile          # Foundation image with security tools
-│   ├── ci-go/Dockerfile           # Go 1.24 development environment
+│   ├── ci-go/Dockerfile           # Go 1.25 development environment
 │   ├── ci-npm/Dockerfile          # Node.js 20 + TypeScript + React/Vite
 │   ├── ci-go-npm/Dockerfile       # Combined full-stack environment
 │   ├── ci-python/Dockerfile       # Python development environment
