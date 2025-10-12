@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Go 1.25 (consistent with other stages)
+# Install Go 1.25.1 (consistent with other stages)
 ARG TARGETARCH
 RUN set -eux; \
     case "${TARGETARCH}" in \
@@ -20,7 +20,7 @@ RUN set -eux; \
         'arm64') GO_ARCH='arm64' ;; \
         *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
     esac; \
-    wget -O go.tar.gz "https://go.dev/dl/go1.25.0.linux-${GO_ARCH}.tar.gz" && \
+    wget -O go.tar.gz "https://go.dev/dl/go1.25.1.linux-${GO_ARCH}.tar.gz" && \
     tar -C /usr/local -xzf go.tar.gz && \
     rm go.tar.gz
 

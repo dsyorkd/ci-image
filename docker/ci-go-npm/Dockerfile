@@ -69,14 +69,14 @@ FROM ghcr.io/dsyorkd/ci-image/ci-base:v2.0
 # Architecture argument for multi-platform builds
 ARG TARGETARCH
 
-# Install Go 1.25 (same version as builder for consistency)
+# Install Go 1.25.1 (same version as builder for consistency)
 RUN set -eux; \
     case "${TARGETARCH}" in \
         'amd64') GO_ARCH='amd64' ;; \
         'arm64') GO_ARCH='arm64' ;; \
         *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
     esac; \
-    wget -O go.tar.gz "https://go.dev/dl/go1.25.0.linux-${GO_ARCH}.tar.gz" && \
+    wget -O go.tar.gz "https://go.dev/dl/go1.25.1.linux-${GO_ARCH}.tar.gz" && \
     sudo tar -C /usr/local -xzf go.tar.gz && \
     rm go.tar.gz
 
