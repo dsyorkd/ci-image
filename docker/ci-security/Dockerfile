@@ -13,4 +13,4 @@ RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/
 WORKDIR /workspace
 
 # Default command
-CMD ["/bin/bash"]
+CMD ["/bin/bash"]# TODO: Consider adding non-root user for security
