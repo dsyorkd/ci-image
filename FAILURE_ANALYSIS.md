@@ -1,23 +1,23 @@
 # CI Failure Analysis
 
-**Workflow:** CI Tests
-**Run Number:** 1
-**Commit:** d02d0b841d940a4478945e8349cec4f672c7adf2
+**Workflow:** Build and Publish Images
+**Run Number:** 19
+**Commit:** 4d5fcf0c2345b91ce06ce01ad76a460924a60a2d
 **Branch:** main
-**Failure Time:** 2025-09-07T18:12:27.281Z
+**Failure Time:** 2025-10-12T17:30:28.415Z
 
 ## Failed Jobs Analysis
 
-### Job: docker-tests (ci-npm)
+### Job: build-and-push-dependent-images (ci-go-npm, Full-Stack Development Image, Combined Go and Node.js...
 **Failed Steps:**
-- Test Docker build (concluded: failure)
+- Build and push ci-go-npm image (concluded: failure)
 
 **Suggested Fixes:**
-- Review test dependencies and environment setup
-- Check for flaky tests and race conditions
-- Verify test data and fixtures
+- Check Docker build context and Dockerfile syntax
+- Verify multi-arch build compatibility
+- Review registry authentication and permissions
 
 ## Automated Actions Taken
-- ✅ Review test dependencies and environment setup
-- ✅ Check for flaky tests and race conditions
-- ✅ Verify test data and fixtures
+- ✅ Check Docker build context and Dockerfile syntax
+- ✅ Verify multi-arch build compatibility
+- ✅ Review registry authentication and permissions
