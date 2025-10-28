@@ -31,7 +31,7 @@ RUN go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
 RUN go install honnef.co/go/tools/cmd/staticcheck@latest
 
 # Stage 2: Node.js builder for installing npm global tools
-FROM node:22-bookworm AS npm-builder
+FROM node:24-bookworm AS npm-builder
 
 # Update packages and install security updates
 RUN apt-get update && \
