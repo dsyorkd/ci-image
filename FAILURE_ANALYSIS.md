@@ -1,23 +1,23 @@
 # CI Failure Analysis
 
-**Workflow:** CI Tests
-**Run Number:** 1
-**Commit:** d02d0b841d940a4478945e8349cec4f672c7adf2
-**Branch:** main
-**Failure Time:** 2025-09-07T18:12:27.281Z
+**Workflow:** Security Scan
+**Run Number:** 120
+**Commit:** fca4f69b3846175ba6d88812092c7c4f8073daa4
+**Branch:** renovate/actions-checkout-6.x
+**Failure Time:** 2025-11-20T16:46:38.274Z
 
 ## Failed Jobs Analysis
 
-### Job: docker-tests (ci-npm)
+### Job: scan-dependent-images (ci-go-npm)
 **Failed Steps:**
-- Test Docker build (concluded: failure)
+- Build image for scanning (concluded: failure)
 
 **Suggested Fixes:**
-- Review test dependencies and environment setup
-- Check for flaky tests and race conditions
-- Verify test data and fixtures
+- Review security scan configurations
+- Update vulnerability database
+- Check for new security policy violations
 
 ## Automated Actions Taken
-- ✅ Review test dependencies and environment setup
-- ✅ Check for flaky tests and race conditions
-- ✅ Verify test data and fixtures
+- ✅ Review security scan configurations
+- ✅ Update vulnerability database
+- ✅ Check for new security policy violations
