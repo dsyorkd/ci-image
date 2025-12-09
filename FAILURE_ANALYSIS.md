@@ -1,14 +1,14 @@
 # CI Failure Analysis
 
 **Workflow:** CI Tests
-**Run Number:** 1
-**Commit:** d02d0b841d940a4478945e8349cec4f672c7adf2
-**Branch:** main
-**Failure Time:** 2025-09-07T18:12:27.281Z
+**Run Number:** 48
+**Commit:** daf43de256311ecce911820647eabe36a25dcb66
+**Branch:** renovate/davidanson-markdownlint-cli2-action-22.x
+**Failure Time:** 2025-12-09T11:02:25.498Z
 
 ## Failed Jobs Analysis
 
-### Job: docker-tests (ci-npm)
+### Job: test-dependent-images (ci-go-npm)
 **Failed Steps:**
 - Test Docker build (concluded: failure)
 
