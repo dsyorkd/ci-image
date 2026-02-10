@@ -1,5 +1,5 @@
 # Stage 1: Go builder for installing Go-specific tools
-FROM golang:1.25-bookworm AS go-builder
+FROM golang:1.26-bookworm AS go-builder
 
 # Set environment variables for Go
 ENV GOOS=linux
