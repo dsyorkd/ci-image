@@ -14,4 +14,4 @@ RUN pip install --upgrade pip setuptools wheel
 WORKDIR /workspace
 
 # Default command
-CMD ["/bin/bash"]
+CMD ["/bin/bash"]# TODO: Consider adding non-root user for security
