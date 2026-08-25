@@ -1,14 +1,14 @@
 # CI Failure Analysis
 
 **Workflow:** CI Tests
-**Run Number:** 1
-**Commit:** d02d0b841d940a4478945e8349cec4f672c7adf2
-**Branch:** main
-**Failure Time:** 2025-09-07T18:12:27.281Z
+**Run Number:** 44
+**Commit:** fc0748dbb6aa291842061893a1cb69ddd4dafc51
+**Branch:** renovate/hadolint-hadolint-action-3.x
+**Failure Time:** 2025-11-11T02:46:37.755Z
 
 ## Failed Jobs Analysis
 
-### Job: docker-tests (ci-npm)
+### Job: test-dependent-images (ci-go-npm)
 **Failed Steps:**
 - Test Docker build (concluded: failure)
 
