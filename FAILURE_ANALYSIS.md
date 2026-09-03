@@ -1,14 +1,14 @@
 # CI Failure Analysis
 
 **Workflow:** CI Tests
-**Run Number:** 1
-**Commit:** d02d0b841d940a4478945e8349cec4f672c7adf2
-**Branch:** main
-**Failure Time:** 2025-09-07T18:12:27.281Z
+**Run Number:** 61
+**Commit:** 3afb29df531e9088e2cfc37e29850e619b5b4998
+**Branch:** renovate/actions-setup-python-7.x
+**Failure Time:** 2026-09-03T06:08:12.592Z
 
 ## Failed Jobs Analysis
 
-### Job: docker-tests (ci-npm)
+### Job: test-dependent-images (ci-go-npm)
 **Failed Steps:**
 - Test Docker build (concluded: failure)
 
